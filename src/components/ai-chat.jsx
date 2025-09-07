@@ -42,23 +42,21 @@ export default function AIChatPanel(props) {
   }, [])
 
   useEffect(() => {
-    // Set initial position near top-right
+    // Set initial position as docked on the right side
     if (typeof window !== 'undefined') {
-      const width = 400
-      const margin = 16
-      const x = Math.max(margin, window.innerWidth - width - margin)
-      const y = margin
-      setPanelPos({ x, y })
+      setSnapCorner('tr') // Dock to top-right initially
+      const panelWidth = panelRef.current?.offsetWidth ?? 400
+      setPanelPos({ x: Math.max(0, window.innerWidth - panelWidth), y: 0 })
     }
   }, [])
 
   useEffect(() => {
-    // After mount, re-measure and align near top-right as floating (not docked)
+    // After mount, ensure it's docked to the right side
     const id = requestAnimationFrame(() => {
       if (typeof window === 'undefined') return
-      const margin = 16
       const panelWidth = panelRef.current?.offsetWidth ?? 400
-      setPanelPos({ x: Math.max(margin, window.innerWidth - panelWidth - margin), y: margin })
+      setSnapCorner('tr') // Dock to top-right
+      setPanelPos({ x: Math.max(0, window.innerWidth - panelWidth), y: 0 })
     })
     return () => cancelAnimationFrame(id)
   }, [])
@@ -224,11 +222,11 @@ export default function AIChatPanel(props) {
     ? (snapCorner === 'tl' || snapCorner === 'bl'
       ? { left: 0, right: 'auto', top: 0, bottom: 0 }
       : { right: 0, left: 'auto', top: 0, bottom: 0 })
-    : { left: panelPos.x, top: panelPos.y, borderRadius: '16px' }
+    : { left: panelPos.x, top: panelPos.y }
 
   return (
     <div ref={panelRef} className={containerClasses} style={containerStyle}>
-      <div className="flex items-center px-2 py-2 select-none text-white bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-500">
+      <div className="flex items-center px-2 py-2 select-none text-white bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700">
         <label className="text-sm font-semibold drop-shadow">Chat</label>
         {/* {!isDocked && (
           <button aria-label="Dock left" onClick={(e) => { e.preventDefault(); setLastFloatPos(panelPos); setSnapCorner('tl'); setPanelPos({ x: 0, y: 0 }) }} title="Dock left" className="inline-flex items-center justify-center h-6 w-6 rounded-md border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100">
@@ -276,7 +274,7 @@ export default function AIChatPanel(props) {
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 flex flex-col gap-2 bg-gradient-to-b from-white/80 to-white/50">
         {messages.map((m) => (
           <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] rounded-lg px-2 py-1 text-sm whitespace-pre-wrap shadow ${m.role === 'user' ? 'bg-gradient-to-br from-cyan-500 via-emerald-500 to-teal-500 text-white border-0' : 'bg-white/80 text-slate-900 border border-white/50 backdrop-blur-sm'}`}>
+            <div className={`max-w-[80%] rounded-lg px-2 py-1 text-sm whitespace-pre-wrap shadow ${m.role === 'user' ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 text-white border-0' : 'bg-white/80 text-slate-900 border border-white/50 backdrop-blur-sm'}`}>
               {m.text}{(streamingMessageIdRef.current && m.id === streamingMessageIdRef.current) ? '▍' : ''}
             </div>
           </div>

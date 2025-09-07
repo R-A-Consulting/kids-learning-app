@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
+import { Link } from 'react-router-dom'
 
 // Sample pages data
 const pages = [
@@ -116,71 +117,75 @@ export default function DashboardPage() {
         {/* Pages Grid - Consistent Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           {/* New Page Card */}
-          <Card className="bg-gray-50 border-[2px] border-dashed border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer group min-h-[140px] shadow-none">
-            <CardContent className="p-4 flex flex-col justify-start items-start h-full">
-              {/* Thumbnail */}
-              <div className="flex items-center justify-center w-12 h-12 bg-blue-100 group-hover:bg-blue-200 rounded-lg mb-3 transition-colors">
-                <Plus className="h-5 w-5 text-blue-600" />
-              </div>
-
-              {/* Content */}
-              <div className="space-y-1 w-full">
-                <h3 className="font-medium text-gray-900 text-sm">
-                  New Page
-                </h3>
-                <p className="text-xs text-gray-500">
-                  Create a new page
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Existing Pages */}
-          {pages.map((page) => (
-            <Card key={page.id} className="bg-white border border-gray-100 hover:border-blue-300 transition-all duration-200 cursor-pointer group h-[200px] shadow-soft hover:shadow-soft-md p-1">
-              <CardContent className="p-0 flex flex-col justify-start items-start h-full">
+          <Link to="/canvas/new">
+            <Card className="bg-gray-50 border-[2px] border-dashed border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer group min-h-[140px] shadow-none">
+              <CardContent className="p-4 flex flex-col justify-start items-start h-full">
                 {/* Thumbnail */}
-                <div className="flex items-center justify-center w-full h-full bg-blue-50 group-hover:bg-blue-100 rounded-lg mb-3 transition-colors">
-                  <span className="text-xl">{page.thumbnail}</span>
+                <div className="flex items-center justify-center w-12 h-12 bg-blue-100 group-hover:bg-blue-200 rounded-lg mb-3 transition-colors">
+                  <Plus className="h-5 w-5 text-blue-600" />
                 </div>
 
                 {/* Content */}
-                <div className="space-y-1 w-full px-2 pb-2">
-                  <h3 className="font-medium text-gray-900 text-sm leading-tight truncate">
-                    {page.title}
+                <div className="space-y-1 w-full">
+                  <h3 className="font-medium text-gray-900 text-sm">
+                    New Page
                   </h3>
-
-                  <div className="flex items-center justify-between w-full">
-                    <span className="text-xs text-gray-500">
-                      {page.lastOpened}
-                    </span>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100">
-                          <MoreHorizontal className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-32 shadow-soft-lg border-gray-100">
-                        <DropdownMenuItem className="text-xs py-1">
-                          <Edit className="h-3 w-3 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-xs py-1">
-                          <Share className="h-3 w-3 mr-2" />
-                          Share
-                        </DropdownMenuItem>
-                        <Separator className="my-1" />
-                        <DropdownMenuItem className="text-xs py-1 text-red-600 hover:text-red-700 hover:bg-red-50">
-                          <Trash2 className="h-3 w-3 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                  <p className="text-xs text-gray-500">
+                    Create a new page
+                  </p>
                 </div>
               </CardContent>
             </Card>
+          </Link>
+
+          {/* Existing Pages */}
+          {pages.map((page) => (
+            <Link key={page.id} to={`/canvas/${page.id}`}>
+              <Card className="bg-white border border-gray-100 hover:border-blue-300 transition-all duration-200 cursor-pointer group h-[200px] shadow-soft hover:shadow-soft-md p-1">
+                <CardContent className="p-0 flex flex-col justify-start items-start h-full">
+                  {/* Thumbnail */}
+                  <div className="flex items-center justify-center w-full h-full bg-blue-50 group-hover:bg-blue-100 rounded-lg mb-3 transition-colors">
+                    <span className="text-xl">{page.thumbnail}</span>
+                  </div>
+
+                  {/* Content */}
+                  <div className="space-y-1 w-full px-2 pb-2">
+                    <h3 className="font-medium text-gray-900 text-sm leading-tight truncate">
+                      {page.title}
+                    </h3>
+
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs text-gray-500">
+                        {page.lastOpened}
+                      </span>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100">
+                            <MoreHorizontal className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-32 shadow-soft-lg border-gray-100">
+                          <DropdownMenuItem className="text-xs py-1">
+                            <Edit className="h-3 w-3 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-xs py-1">
+                            <Share className="h-3 w-3 mr-2" />
+                            Share
+                          </DropdownMenuItem>
+                          <Separator className="my-1" />
+                          <DropdownMenuItem className="text-xs py-1 text-red-600 hover:text-red-700 hover:bg-red-50">
+                            <Trash2 className="h-3 w-3 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
 

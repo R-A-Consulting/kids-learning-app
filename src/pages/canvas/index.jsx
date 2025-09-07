@@ -1,8 +1,13 @@
 import { Tldraw } from 'tldraw'
 import 'tldraw/tldraw.css'
 import AIChatPanel from '../../components/ai-chat.jsx'
+import { useParams } from 'react-router-dom'
 
 export default function TldrawApp() {
+  const { id } = useParams()
+
+  // For now, just log the ID to verify it's working
+  console.log('Canvas ID:', id)
   function handleDockChange({ side, width }) {
     // This component doesn't need to re-render; we style via DOM to avoid layout thrash.
     // But we'll still keep this here in case we want stateful layout later.
@@ -28,7 +33,7 @@ export default function TldrawApp() {
     window.dispatchEvent(new Event('resize'))
   }
   return (
-    <div className="h-full flex flex-row bg-gradient-to-br from-cyan-50 via-indigo-50 to-violet-50">
+    <div className="h-screen w-screen flex flex-row bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200">
       <div id="canvas-container" className="flex-[1_1_0%] min-w-0 transition-[margin] duration-200 ease-[cubic-bezier(.2,.8,.2,1)]">
         <div className="h-full w-full bg-white shadow-inner rounded-none">
           <Tldraw />

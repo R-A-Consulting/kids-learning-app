@@ -5,6 +5,10 @@ import DashboardPage from './pages/dashboard';
 const routes = [
   {
     path: '/',
+    element: <LoginPage />,
+  },
+  {
+    path: '/canvas/:id',
     element: <Canvas />,
   },
   {
