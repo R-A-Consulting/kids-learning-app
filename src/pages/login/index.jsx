@@ -24,10 +24,9 @@ export default function LoginPage() {
 
       if (result.success) {
         // Successful login - show success toast and redirect
-        toast.success('Welcome back! Redirecting to dashboard...')
         setTimeout(() => {
-          // navigate('/dashboard')
-        }, 1000)
+          navigate('/dashboard')
+        }, 100)
       } else {
         // Failed login - show error toast
         toast.error(result.error || 'Login failed. Please try again.')

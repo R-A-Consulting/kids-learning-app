@@ -1,8 +1,10 @@
 import { useState, useCallback } from 'react';
+import { GlobalContext } from '@/services/contexts/global-context';
 
 const API_BASE_URL = import.meta.env.VITE_BASE_URL || '';
 
 export const useLogin = () => {
+  const { setUser: setUserGlobal } = GlobalContext();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
@@ -21,9 +23,6 @@ export const useLogin = () => {
         body: JSON.stringify(credentials),
       });
 
-      const cookies = response.headers.get('set-cookie');
-      console.log(cookies);
-
       const data = await response.json();
 
       if (!response.ok) {
@@ -31,11 +30,12 @@ export const useLogin = () => {
       }
 
       // Store user data
-      setUser(data.user || data);
+      setUserGlobal(data.data.user || null);
+      setUser(data.data.user || null);
 
       return {
         success: true,
-        user: data.user || data,
+        user: data.data.user || null,
         message: data.message || 'Login successful'
       };
     } catch (err) {
