@@ -5,25 +5,35 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { GraduationCap } from 'lucide-react'
+import { useLogin } from '@/services/apis/auth'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const navigate = useNavigate()
+  const { login, isLoading, error } = useLogin()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
 
-    // Simple authentication check
-    if (username === 'admin' && password === 'admin') {
-      // Successful login - show success toast and redirect
-      toast.success('Welcome back! Redirecting to dashboard...')
-      setTimeout(() => {
-        navigate('/dashboard')
-      }, 1000)
-    } else {
-      // Failed login - show error toast
-      toast.error('Invalid username or password. Please try again.')
+    try {
+      const result = await login({
+        email: username,
+        password: password
+      })
+
+      if (result.success) {
+        // Successful login - show success toast and redirect
+        toast.success('Welcome back! Redirecting to dashboard...')
+        setTimeout(() => {
+          // navigate('/dashboard')
+        }, 1000)
+      } else {
+        // Failed login - show error toast
+        toast.error(result.error || 'Login failed. Please try again.')
+      }
+    } catch {
+      toast.error('An unexpected error occurred. Please try again.')
     }
   }
 
@@ -69,13 +79,23 @@ export default function LoginPage() {
             />
           </div>
 
-          <Button type="submit" className="w-full h-11 bg-blue-600 hover:bg-blue-700">
-            Sign In
+          <Button
+            type="submit"
+            className="w-full h-11 bg-blue-600 hover:bg-blue-700"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Signing In...' : 'Sign In'}
           </Button>
+
+          {error && (
+            <div className="text-center">
+              <p className="text-xs text-red-500">{error}</p>
+            </div>
+          )}
 
           <div className="text-center">
             <p className="text-xs text-gray-500">
-              Testing Mode: Username: admin, Password: admin
+              Enter your credentials to sign in
             </p>
           </div>
         </form>
