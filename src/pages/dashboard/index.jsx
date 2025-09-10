@@ -1,9 +1,13 @@
+import { useEffect } from 'react'
 import {
   MoreHorizontal,
   Trash2,
   Edit,
   Share,
-  Plus
+  Plus,
+  BookOpen,
+  Calendar,
+  Users
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,105 +20,52 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Link } from 'react-router-dom'
+import { useGetAllSessions } from '@/services/apis/sessions/useGetAllSessions'
 
-// Sample pages data
-const pages = [
-  {
-    id: 1,
-    title: 'Shape Detective: Hunt for Hidden Geometric Figures',
-    thumbnail: '🔺',
-    lastOpened: '2 hours ago',
-    type: 'math'
-  },
-  {
-    id: 2,
-    title: 'Number Patterns: Discover the Magic of Sequences',
-    thumbnail: '🔢',
-    lastOpened: '5 hours ago',
-    type: 'math'
-  },
-  {
-    id: 3,
-    title: 'Planet Puzzles: Explore the Solar System Mysteries',
-    thumbnail: '🪐',
-    lastOpened: '1 day ago',
-    type: 'science'
-  },
-  {
-    id: 4,
-    title: 'Measurement Master: Ruler of Length and Volume',
-    thumbnail: '📏',
-    lastOpened: '2 days ago',
-    type: 'math'
-  },
-  {
-    id: 5,
-    title: 'Animal Architects: Build Amazing Animal Habitats',
-    thumbnail: '🏗️',
-    lastOpened: '3 days ago',
-    type: 'science'
-  },
-  {
-    id: 6,
-    title: 'Color Theory Quest: Master the Rainbow Palette',
-    thumbnail: '🎨',
-    lastOpened: '1 week ago',
-    type: 'art'
-  },
-  {
-    id: 7,
-    title: 'Fraction Fun: Divide and Conquer Pizza Problems',
-    thumbnail: '🥧',
-    lastOpened: '2 weeks ago',
-    type: 'math'
-  },
-  {
-    id: 8,
-    title: 'Weather Predictor: Become a Storm Chaser Expert',
-    thumbnail: '🌤️',
-    lastOpened: '3 weeks ago',
-    type: 'science'
-  },
-  {
-    id: 9,
-    title: 'Symmetry Artist: Create Perfect Mirror Images',
-    thumbnail: '🔄',
-    lastOpened: '1 month ago',
-    type: 'art'
-  },
-  {
-    id: 10,
-    title: 'Force & Motion: Physics of Speed and Power',
-    thumbnail: '🏃',
-    lastOpened: '2 months ago',
-    type: 'science'
-  },
-  {
-    id: 11,
-    title: 'Time Teller: Master Clocks and Calendars',
-    thumbnail: '🕐',
-    lastOpened: '3 months ago',
-    type: 'math'
-  },
-  {
-    id: 12,
-    title: 'Nature Patterns: Find Beauty in Mathematical Design',
-    thumbnail: '🌿',
-    lastOpened: '4 months ago',
-    type: 'art'
-  },
-]
+// Helper function to format date
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
+
+  if (diffInHours < 1) return 'Just now';
+  if (diffInHours < 24) return `${diffInHours} hours ago`;
+  if (diffInHours < 168) return `${Math.floor(diffInHours / 24)} days ago`;
+  if (diffInHours < 720) return `${Math.floor(diffInHours / 168)} weeks ago`;
+  return `${Math.floor(diffInHours / 720)} months ago`;
+};
+
+// Helper function to get subject icon
+const getSubjectIcon = (subject) => {
+  const subjectIcons = {
+    'Mathematics': '🔢',
+    'Science': '🧪',
+    'Art': '🎨',
+    'History': '📚',
+    'Geography': '🌍',
+    'English': '📝',
+    'Physics': '⚛️',
+    'Chemistry': '🧬',
+    'Biology': '🦠'
+  };
+  return subjectIcons[subject] || '📖';
+};
 
 export default function DashboardPage() {
+  const { sessions, isLoading, error, getAllSessions } = useGetAllSessions();
+
+  useEffect(() => {
+    getAllSessions();
+  }, [getAllSessions]);
   return (
     <>
       <header className="flex h-12 shrink-0 items-center gap-3 border-b px-4 bg-white">
         <SidebarTrigger className="-ml-1" />
-        <h1 className="text-sm font-medium text-gray-700">Pages</h1>
+        <h1 className="text-sm font-medium text-gray-700">Learning Sessions</h1>
       </header>
 
       <div className="flex-1 bg-white p-4 px-6">
-        {/* Pages Grid - Consistent Layout */}
+        {/* Sessions Grid - Consistent Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           {/* New Page Card */}
           <Link to="/canvas/new">
@@ -138,26 +89,34 @@ export default function DashboardPage() {
             </Card>
           </Link>
 
-          {/* Existing Pages */}
-          {pages.map((page) => (
-            <Link key={page.id} to={`/canvas/${page.id}`}>
+          {/* Existing Sessions */}
+          {sessions.map((session) => (
+            <Link key={session._id} to={`/canvas/${session._id}`}>
               <Card className="bg-white border border-gray-100 hover:border-blue-300 transition-all duration-200 cursor-pointer group h-[200px] shadow-soft hover:shadow-soft-md p-1">
                 <CardContent className="p-0 flex flex-col justify-start items-start h-full">
                   {/* Thumbnail */}
                   <div className="flex items-center justify-center w-full h-full bg-blue-50 group-hover:bg-blue-100 rounded-lg mb-3 transition-colors">
-                    <span className="text-xl">{page.thumbnail}</span>
+                    <span className="text-xl">{getSubjectIcon(session.subject)}</span>
                   </div>
 
                   {/* Content */}
                   <div className="space-y-1 w-full px-2 pb-2">
                     <h3 className="font-medium text-gray-900 text-sm leading-tight truncate">
-                      {page.title}
+                      {session.name}
                     </h3>
+                    <p className="text-xs text-gray-600 leading-tight truncate">
+                      {session.description}
+                    </p>
 
                     <div className="flex items-center justify-between w-full">
-                      <span className="text-xs text-gray-500">
-                        {page.lastOpened}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-xs text-gray-500">
+                          {formatDate(session.lastAccessedAt)}
+                        </span>
+                        <span className="text-xs text-blue-600 font-medium">
+                          {session.subject}
+                        </span>
+                      </div>
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -189,17 +148,44 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Empty State for when no pages */}
-        {pages.length === 0 && (
+        {/* Empty State for when no sessions */}
+        {!isLoading && !error && sessions.length === 0 && (
           <div className="flex flex-col justify-start items-start py-8">
             <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center mb-3">
               <span className="text-xl">📄</span>
             </div>
-            <h3 className="text-base font-medium text-gray-900 mb-1">No pages yet</h3>
-            <p className="text-sm text-gray-500 mb-3">Create your first page to get started.</p>
+            <h3 className="text-base font-medium text-gray-900 mb-1">No sessions yet</h3>
+            <p className="text-sm text-gray-500 mb-3">Create your first learning session to get started.</p>
             <Button variant="outline" size="sm" className="border-blue-200 text-blue-700 hover:bg-blue-50">
               <Plus className="h-4 w-4 mr-2" />
-              Create Page
+              Create Session
+            </Button>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex flex-col justify-center items-center py-12">
+            <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3"></div>
+            <p className="text-sm text-gray-500">Loading sessions...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="flex flex-col justify-center items-center py-12">
+            <div className="w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center mb-3">
+              <span className="text-xl">❌</span>
+            </div>
+            <h3 className="text-base font-medium text-gray-900 mb-1">Failed to load sessions</h3>
+            <p className="text-sm text-red-600 mb-3">{error}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={getAllSessions}
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              Try Again
             </Button>
           </div>
         )}

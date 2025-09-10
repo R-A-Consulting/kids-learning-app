@@ -9,7 +9,7 @@ export const useGetAllSessions = () => {
 
   // Helper function for API calls
   const apiRequest = useCallback(async (url, options = {}) => {
-    const response = await fetch(`${API_BASE_URL}/api${url}`, {
+    const response = await fetch(`${API_BASE_URL}${url}`, {
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
@@ -38,7 +38,7 @@ export const useGetAllSessions = () => {
       });
 
       // Update local state
-      const sessionsData = data.sessions || data || [];
+      const sessionsData = data.data.sessions || [];
       setSessions(sessionsData);
 
       return {
