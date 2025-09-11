@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 
-const API_BASE_URL = import.meta.env.VITE_BASE_URL || '';
+// Use proxy in development, full URL in production
+const API_BASE_URL = import.meta.env.DEV ? '/api/v1' : (import.meta.env.VITE_BASE_URL || '');
+console.log(API_BASE_URL, "API_BASE_URL");
 
 export const useGetAllSessions = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -10,7 +12,7 @@ export const useGetAllSessions = () => {
   // Helper function for API calls
   const apiRequest = useCallback(async (url, options = {}) => {
     const response = await fetch(`${API_BASE_URL}${url}`, {
-      headers: {
+      headers: { 
         'Content-Type': 'application/json',
         ...options.headers,
       },

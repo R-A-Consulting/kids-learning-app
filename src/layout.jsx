@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Link } from 'react-router-dom';
 import routes from './routes';
 import {
   Sidebar,
@@ -58,10 +58,10 @@ function AppLayout() {
                     {menuItems.map((item) => (
                       <SidebarMenuItem key={item.title}>
                         <SidebarMenuButton asChild>
-                          <a href={item.url}>
+                          <Link to={item.url}>
                             <item.icon className="h-4 w-4" />
                             <span>{item.title}</span>
-                          </a>
+                          </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     ))}

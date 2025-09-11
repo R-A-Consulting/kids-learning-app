@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
   MoreHorizontal,
   Trash2,
@@ -19,8 +19,21 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useGetAllSessions } from '@/services/apis/sessions/useGetAllSessions'
+import { useCreateSession } from '@/services/apis/sessions/useCreateSession'
+import { GlobalContext } from '@/services/contexts/global-context'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 // Helper function to format date
 const formatDate = (dateString) => {
@@ -52,11 +65,56 @@ const getSubjectIcon = (subject) => {
 };
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
+  const { user } = GlobalContext();
   const { sessions, isLoading, error, getAllSessions } = useGetAllSessions();
+  const { createSession, isLoading: isCreating } = useCreateSession();
+  
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    subject: '',
+    gradeLevel: ''
+  });
 
   useEffect(() => {
     getAllSessions();
   }, [getAllSessions]);
+
+  const handleCreateSession = async () => {
+    if (!formData.name || !formData.subject || !formData.gradeLevel) {
+      return;
+    }
+
+    const sessionData = {
+      ...formData,
+      participants: [user?._id || user?.id]
+    };
+
+    const result = await createSession(sessionData);
+    if (result.success && result.session?._id) {
+      setDialogOpen(false);
+      navigate(`/canvas/${result.session._id}`);
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleDialogChange = (open) => {
+    setDialogOpen(open);
+    if (!open) {
+      // Reset form when dialog closes
+      setFormData({
+        name: '',
+        description: '',
+        subject: '',
+        gradeLevel: ''
+      });
+    }
+  };
   return (
     <>
       <header className="flex h-12 shrink-0 items-center gap-3 border-b px-4 bg-white">
@@ -67,27 +125,122 @@ export default function DashboardPage() {
       <div className="flex-1 bg-white p-4 px-6">
         {/* Sessions Grid - Consistent Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-          {/* New Page Card */}
-          <Link to="/canvas/new">
-            <Card className="bg-gray-50 border-[2px] border-dashed border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer group min-h-[140px] shadow-none">
-              <CardContent className="p-4 flex flex-col justify-start items-start h-full">
-                {/* Thumbnail */}
-                <div className="flex items-center justify-center w-12 h-12 bg-blue-100 group-hover:bg-blue-200 rounded-lg mb-3 transition-colors">
-                  <Plus className="h-5 w-5 text-blue-600" />
-                </div>
+          {/* New Page Card with Dialog */}
+          <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
+            <DialogTrigger asChild>
+              <Card className="bg-gray-50 border-[2px] border-dashed border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer group min-h-[140px] shadow-none">
+                <CardContent className="p-4 flex flex-col justify-start items-start h-full">
+                  {/* Thumbnail */}
+                  <div className="flex items-center justify-center w-12 h-12 bg-blue-100 group-hover:bg-blue-200 rounded-lg mb-3 transition-colors">
+                    <Plus className="h-5 w-5 text-blue-600" />
+                  </div>
 
-                {/* Content */}
-                <div className="space-y-1 w-full">
-                  <h3 className="font-medium text-gray-900 text-sm">
-                    New Page
-                  </h3>
-                  <p className="text-xs text-gray-500">
-                    Create a new page
-                  </p>
+                  {/* Content */}
+                  <div className="space-y-1 w-full">
+                    <h3 className="font-medium text-gray-900 text-sm">
+                      New Session
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Create a new learning session
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </DialogTrigger>
+            
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Create New Session</DialogTitle>
+                <DialogDescription>
+                  Start a new learning session by providing the details below.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Session Name *</Label>
+                  <Input
+                    id="name"
+                    placeholder="e.g., Math Learning Session"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          </Link>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Input
+                    id="description"
+                    placeholder="e.g., Learning basic arithmetic"
+                    value={formData.description}
+                    onChange={(e) => handleInputChange('description', e.target.value)}
+                  />
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="subject">Subject *</Label>
+                  <select
+                    id="subject"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={formData.subject}
+                    onChange={(e) => handleInputChange('subject', e.target.value)}
+                  >
+                    <option value="">Select a subject</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Science">Science</option>
+                    <option value="English">English</option>
+                    <option value="History">History</option>
+                    <option value="Geography">Geography</option>
+                    <option value="Art">Art</option>
+                    <option value="Physics">Physics</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Biology">Biology</option>
+                  </select>
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="gradeLevel">Grade Level *</Label>
+                  <select
+                    id="gradeLevel"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={formData.gradeLevel}
+                    onChange={(e) => handleInputChange('gradeLevel', e.target.value)}
+                  >
+                    <option value="">Select grade level</option>
+                    <option value="Kindergarten">Kindergarten</option>
+                    <option value="Grade 1">Grade 1</option>
+                    <option value="Grade 2">Grade 2</option>
+                    <option value="Grade 3">Grade 3</option>
+                    <option value="Grade 4">Grade 4</option>
+                    <option value="Grade 5">Grade 5</option>
+                    <option value="Grade 6">Grade 6</option>
+                    <option value="Grade 7">Grade 7</option>
+                    <option value="Grade 8">Grade 8</option>
+                    <option value="Grade 9">Grade 9</option>
+                    <option value="Grade 10">Grade 10</option>
+                    <option value="Grade 11">Grade 11</option>
+                    <option value="Grade 12">Grade 12</option>
+                  </select>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setDialogOpen(false)}
+                  disabled={isCreating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateSession}
+                  disabled={!formData.name || !formData.subject || !formData.gradeLevel || isCreating}
+                >
+                  {isCreating ? 'Creating...' : 'Create Session'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Existing Sessions */}
           {sessions.map((session) => (

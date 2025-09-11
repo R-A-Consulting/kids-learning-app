@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 
-const API_BASE_URL = import.meta.env.VITE_BASE_URL || '';
+// Use proxy in development, full URL in production
+const API_BASE_URL = import.meta.env.DEV ? '/api/v1' : (import.meta.env.VITE_BASE_URL || '');
 
 export const useRegister = () => {
   const [isLoading, setIsLoading] = useState(false);
