@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { Send, Maximize2, Minimize2, Paperclip, X, Sparkles, Loader2, Image } from 'lucide-react'
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -7,6 +8,7 @@ import { useCreateStreamingMessage } from '@/services/apis/chat/useStreamingMess
 import { useGetSessionMessages } from '@/services/apis/chat/useGetSessionMessages'
 import { GlobalContext } from '@/services/contexts/global-context'
 import { motion, AnimatePresence } from 'framer-motion'
+import MessageFormatter from '@/components/canvas-chat/message-formatter'
 
 // Shimmer phrases for AI thinking state
 const LOADING_PHRASES = [
@@ -24,8 +26,8 @@ export default function AiChat({
   setIsMinimized,
   handleMouseDown,
   sessionId,
-  captureCanvas,
-  dockedPosition
+  dockedPosition,
+  canvasImage,
 }) {
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
@@ -38,10 +40,19 @@ export default function AiChat({
   
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
-  const [selectedFiles, setSelectedFiles] = useState([])
   const [currentStreamId, setCurrentStreamId] = useState(null)
-  const [includeCanvas, setIncludeCanvas] = useState(true)
+  const [selectedFiles, setSelectedFiles] = useState([])
   const [streamingStatusById, setStreamingStatusById] = useState({})
+
+  useEffect(() => {
+    setSelectedFiles(prev => {
+      let filteredFiles = prev.filter(file => !file?.name?.startsWith('canvas-') || !file?.name)
+      if (canvasImage) {
+        filteredFiles.push(canvasImage)
+      }
+      return filteredFiles
+    })
+  }, [canvasImage])
   
   // Load messages when session changes
   useEffect(() => {
@@ -96,9 +107,6 @@ export default function AiChat({
     const text = draft.trim()
     if (!text || streamingMessageIdRef.current || !sessionId) return
     
-    setDraft('')
-    setSelectedFiles([])
-    
     // Add user message immediately
     const userMessage = { 
       id: `user-${Date.now()}`, 
@@ -119,18 +127,6 @@ export default function AiChat({
     selectedFiles.forEach((file, index) => {
       formData.append('files', file)
     })
-    
-    // Capture canvas if checkbox is marked
-    if (includeCanvas && captureCanvas) {
-      try {
-        const canvasBlob = await captureCanvas()
-        if (canvasBlob) {
-          formData.append('files', canvasBlob, 'canvas-context.png')
-        }
-      } catch (err) {
-        console.error('Failed to capture canvas:', err)
-      }
-    }
 
     // Create assistant message placeholder
     const assistantId = `assistant-${Date.now()}`
@@ -174,7 +170,7 @@ export default function AiChat({
       streamingMessageIdRef.current = null
       setCurrentStreamId(null)
     }
-  }, [draft, setDraft, setMessages, streamingMessageIdRef, sessionId, user, selectedFiles, createStreamingMessage])
+  }, [draft, sessionId, user?._id, user?.id, selectedFiles, createStreamingMessage])
 
   // Focus input when expanded
   useEffect(() => {
@@ -315,8 +311,10 @@ export default function AiChat({
                           </div>
                         ) : (
                           <>
-                            <p className="whitespace-pre-wrap">
-                              {message.text}
+                            <div className="relative">
+                              <MessageFormatter className="text-xs">
+                                {message.text}
+                              </MessageFormatter>
                               {/* Cursor for streaming messages */}
                               {message.isStreaming && streamingMessageIdRef.current === message.id && (
                                 <motion.span
@@ -325,7 +323,7 @@ export default function AiChat({
                                   transition={{ duration: 0.8, repeat: Infinity }}
                                 />
                               )}
-                            </p>
+                            </div>
                             
                             {/* Display attachments */}
                             {message.attachments && message.attachments.length > 0 && (
@@ -358,13 +356,15 @@ export default function AiChat({
           {(selectedFiles.length > 0) && (
             <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
               <div className="flex flex-wrap gap-2">
-                {selectedFiles.map((file, index) => (
+                {selectedFiles
+                  .filter(file => !file?.name || !file?.name?.startsWith('canvas-'))
+                  .map((file, index) => (
                   <div
                     key={index}
                     className="flex items-center gap-1 px-2 py-1 bg-white border border-gray-200 rounded text-xs"
                   >
                     <Paperclip className="h-3 w-3 text-gray-500" />
-                    <span className="max-w-[100px] truncate">{file.name}</span>
+                    <span className="max-w-[100px] truncate">{file?.name || 'file'}</span>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -375,36 +375,20 @@ export default function AiChat({
                     </Button>
                   </div>
                 ))}
-                {/* {includeCanvas && (
-                  <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-                    <Image className="h-3 w-3" />
-                    <span>Canvas context</span>
-                  </div>
-                )} */}
               </div>
             </div>
           )}
 
           {/* Input area */}
           <form 
-            onSubmit={handleSend}
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleSend(e, true)
+              setSelectedFiles([canvasImage])
+              setDraft('')
+            }}
             className="mx-2 rounded-full border border-gray-100 bg-slate-50 mb-2"
           >
-            {/* Canvas context checkbox */}
-            {/* <div className="px-3 py-2 border-b border-gray-100">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includeCanvas}
-                  onChange={(e) => setIncludeCanvas(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                />
-                <span className="text-xs text-gray-600 flex items-center gap-1">
-                  <Image className="h-3 w-3" />
-                  Include canvas context
-                </span>
-              </label>
-            </div> */}
             
             <div className="p-1">
               <div className="flex gap-0 items-center">

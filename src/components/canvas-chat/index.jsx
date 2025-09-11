@@ -5,12 +5,11 @@ import AiChat from './ai-chat'
 // Constants
 const PANEL_WIDTH = 350
 const FLOATING_PANEL_HEIGHT_VH = 90 // 60vh when floating
-const PANEL_HEIGHT_PX = 600 // Fallback for constraints when needed
 const MINIMIZED_HEIGHT = 36
-const DOCK_THRESHOLD = 50
+const DOCK_THRESHOLD = 20
 
 export default function AIChatPanel(props) {
-  const { onDockChange, sessionId, captureCanvas } = props || {}
+  const { onDockChange, sessionId, canvasImage } = props || {}
   
   // State management
   const [isMinimized, setIsMinimized] = useState(false)
@@ -50,8 +49,6 @@ export default function AIChatPanel(props) {
 
   // Handle dragging
   const handleMouseDown = useCallback((e) => {
-    if (isMinimized) return
-    
     const rect = panelRef.current?.getBoundingClientRect()
     if (!rect) return
     
@@ -60,7 +57,7 @@ export default function AIChatPanel(props) {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
     })
-  }, [isMinimized])
+  }, [])
 
   useEffect(() => {
     if (!isDragging) return
@@ -145,7 +142,7 @@ export default function AIChatPanel(props) {
         handleMouseDown={handleMouseDown}
         dockedPosition={dockedPosition}
         sessionId={sessionId}
-        captureCanvas={captureCanvas}
+        canvasImage={canvasImage}
       />
     </div>
   )

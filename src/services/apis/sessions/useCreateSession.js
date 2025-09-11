@@ -40,7 +40,7 @@ export const useCreateSession = () => {
 
       return {
         success: true,
-        session: data.session || data,
+        data: data.data || data,
         message: data.message || 'Session created successfully'
       };
     } catch (err) {

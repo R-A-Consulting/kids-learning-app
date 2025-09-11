@@ -93,9 +93,9 @@ export default function DashboardPage() {
     };
 
     const result = await createSession(sessionData);
-    if (result.success && result.session?._id) {
+    if (result.success && result.data.session?._id) {
       setDialogOpen(false);
-      navigate(`/canvas/${result.session._id}`);
+      navigate(`/canvas/${result.data.session._id}`);
     }
   };
 
