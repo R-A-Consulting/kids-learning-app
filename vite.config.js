@@ -28,7 +28,7 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api/v1': {
-        target: 'http://209.38.122.145/',
+        target: 'https://learn.steeplogic.com/',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path,
