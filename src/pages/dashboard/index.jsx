@@ -245,11 +245,18 @@ export default function DashboardPage() {
           {/* Existing Sessions */}
           {sessions.map((session) => (
             <Link key={session._id} to={`/canvas/${session._id}`}>
-              <Card className="bg-white border border-gray-100 hover:border-blue-300 transition-all duration-200 cursor-pointer group h-[200px] shadow-soft hover:shadow-soft-md p-1">
+              <Card className="bg-white border border-gray-100 hover:border-blue-300 transition-all duration-200 cursor-pointer group h-[250px] shadow-soft hover:shadow-soft-md p-1">
                 <CardContent className="p-0 flex flex-col justify-start items-start h-full">
                   {/* Thumbnail */}
-                  <div className="flex items-center justify-center w-full h-full bg-blue-50 group-hover:bg-blue-100 rounded-lg mb-3 transition-colors">
-                    <span className="text-xl">{getSubjectIcon(session.subject)}</span>
+                  <div className="flex items-center justify-center w-full aspect-[4/3] bg-blue-50 group-hover:bg-blue-100 rounded-lg mb-3 transition-colors overflow-hidden">
+                    {session.sessionThumbnail ? <img
+                      src={session.sessionThumbnail}
+                      alt={session.name}
+                      className="object-cover rounded-lg w-full h-full max-h-40"
+                      style={{ objectFit: 'cover', width: '100%', height: '100%', display: 'block' }}
+                    />
+                    : <span className="text-xl">{getSubjectIcon(session.subject)}</span>
+                  }
                   </div>
 
                   {/* Content */}
