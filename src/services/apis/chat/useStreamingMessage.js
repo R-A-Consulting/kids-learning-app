@@ -1,8 +1,7 @@
 import { useState, useCallback } from 'react';
 
 // Use proxy in development, full URL in production
-// const API_BASE_URL = import.meta.env.DEV ? '/api/v1' : (import.meta.env.VITE_BASE_URL || '');
-const API_BASE_URL = '/api/v1';
+const API_BASE_URL = import.meta.env.DEV ? '/api/v1' : (import.meta.env.VITE_BASE_URL || '');
 
 export const useCreateStreamingMessage = () => {
   const [isLoading, setIsLoading] = useState(false);
