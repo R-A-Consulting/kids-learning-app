@@ -37,6 +37,7 @@ export const useGetAllSessions = () => {
     try {
       const data = await apiRequest('/sessions', {
         method: 'GET',
+        credentials: 'include',
       });
 
       // Update local state
