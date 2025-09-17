@@ -168,7 +168,7 @@ export default function DashboardPage() {
                 </div>
                 
                 <div className="grid gap-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">Description (min. 10 characters)</Label>
                   <Input
                     id="description"
                     placeholder="e.g., Learning basic arithmetic"
