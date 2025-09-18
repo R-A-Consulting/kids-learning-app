@@ -1,11 +1,12 @@
 /* eslint-disable no-unused-vars */
-import { Send, Maximize2, Minimize2, Paperclip, X, Sparkles, Loader2, Image } from 'lucide-react'
+import { Send, Maximize2, Minimize2, Paperclip, X, Sparkles, Loader2, Image, Download, StopCircle } from 'lucide-react'
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useCreateStreamingMessage } from '@/services/apis/chat/useStreamingMessage'
 import { useGetSessionMessages } from '@/services/apis/chat/useGetSessionMessages'
+import { useExportSessionPdf } from '@/services/apis/sessions'
 import { GlobalContext } from '@/services/contexts/global-context'
 import { motion, AnimatePresence } from 'framer-motion'
 import MessageFormatter from '@/components/canvas-chat/message-formatter'
@@ -37,6 +38,7 @@ export default function AiChat({
   const { user } = GlobalContext()
   const { createStreamingMessage, isStreaming: apiStreaming } = useCreateStreamingMessage()
   const { messages: apiMessages, isLoading: messagesLoading, getSessionMessages } = useGetSessionMessages()
+  const { exportSessionPdf, isLoading: exportLoading } = useExportSessionPdf()
   
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
@@ -86,6 +88,7 @@ export default function AiChat({
     }
   }, [messages, isMinimized])
 
+
   // Handle file selection
   const handleFileSelect = useCallback((e) => {
     const files = Array.from(e.target.files || [])
@@ -100,6 +103,13 @@ export default function AiChat({
   const removeFile = useCallback((index) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index))
   }, [])
+
+  // Handle PDF export
+  const handleExportPdf = useCallback(async () => {
+    if (!sessionId || sessionId === 'new') return
+
+    await exportSessionPdf(sessionId)
+  }, [sessionId, exportSessionPdf])
 
   // Handle sending messages
   const handleSend = useCallback(async (e) => {
@@ -145,8 +155,12 @@ export default function AiChat({
         }
         
         if (chunkData.eventType === 'chunk' || chunkData.eventType === 'complete') {
-          setMessages(prev => prev.map(m => 
-            m.id === assistantId ? { ...m, text: accumulated, isStreaming: chunkData.eventType !== 'complete' } : m
+          setMessages(prev => prev.map(m =>
+            m.id === assistantId ? {
+              ...m,
+              text: accumulated,
+              isStreaming: chunkData.eventType !== 'complete'
+            } : m
           ))
         }
 
@@ -157,14 +171,16 @@ export default function AiChat({
       })
 
       if (!result.success) {
-        setMessages(prev => prev.map(m => 
-          m.id === assistantId ? { ...m, text: 'Sorry, I encountered an error. Please try again.', isStreaming: false } : m
+        const errorText = 'Sorry, I encountered an error. Please try again.'
+        setMessages(prev => prev.map(m =>
+          m.id === assistantId ? { ...m, text: errorText, isStreaming: false } : m
         ))
       }
     } catch (error) {
       console.error('Streaming error:', error)
-      setMessages(prev => prev.map(m => 
-        m.id === assistantId ? { ...m, text: 'Sorry, I encountered an error. Please try again.', isStreaming: false } : m
+      const errorText = 'Sorry, I encountered an error. Please try again.'
+      setMessages(prev => prev.map(m =>
+        m.id === assistantId ? { ...m, text: errorText, isStreaming: false } : m
       ))
     } finally {
       streamingMessageIdRef.current = null
@@ -196,18 +212,34 @@ export default function AiChat({
           <Sparkles className="h-3 w-3 text-gray-600" />
           <span className="font-medium text-gray-700 text-xs">Learning Buddy</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5 hover:bg-gray-100"
-          onClick={(e) => {
-            e.stopPropagation()
-            setIsMinimized(!isMinimized)
-          }}
-          hidden={dockedPosition !== 'floating'}
-        >
-          {isMinimized && dockedPosition === 'floating' ? <Maximize2 size={12} /> : <Minimize2 size={10} />}
-        </Button>
+        <div className="flex items-center gap-1">
+          {/* PDF Export Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 hover:bg-gray-100"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleExportPdf()
+            }}
+            disabled={exportLoading || !sessionId || sessionId === 'new'}
+            title="Export as PDF"
+          >
+            <Download size={12} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 hover:bg-gray-100"
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsMinimized(!isMinimized)
+            }}
+            hidden={dockedPosition !== 'floating'}
+          >
+            {isMinimized && dockedPosition === 'floating' ? <Maximize2 size={12} /> : <Minimize2 size={10} />}
+          </Button>
+        </div>
       </div>
 
       {/* Messages area */}
@@ -311,20 +343,54 @@ export default function AiChat({
                           </div>
                         ) : (
                           <>
-                            <div className="relative">
+                            {/* Message content with instant streaming */}
+                            <motion.div
+                              className="relative"
+                              initial={false}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.3 }}
+                            >
                               <MessageFormatter className="text-xs">
                                 {message.text}
                               </MessageFormatter>
-                              {/* Cursor for streaming messages */}
+
+                              {/* Streaming indicator */}
                               {message.isStreaming && streamingMessageIdRef.current === message.id && (
-                                <motion.span
-                                  className="inline-block w-0.5 h-4 bg-gray-800 ml-0.5"
-                                  animate={{ opacity: [1, 0] }}
-                                  transition={{ duration: 0.8, repeat: Infinity }}
-                                />
+                                <motion.div className="relative inline-block ml-0.5">
+                                  <motion.span
+                                    className="inline-block w-0.5 h-4 bg-gradient-to-b from-cyan-300 via-blue-400 to-purple-500"
+                                    animate={{
+                                      opacity: [0.4, 1, 0.4],
+                                      scaleY: [0.7, 1.3, 0.7]
+                                    }}
+                                    transition={{
+                                      duration: 1,
+                                      repeat: Infinity,
+                                      ease: "easeInOut"
+                                    }}
+                                    style={{
+                                      backgroundSize: '200% 200%',
+                                      backgroundImage: 'linear-gradient(45deg, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #06b6d4)'
+                                    }}
+                                  />
+                                  {/* Glow effect */}
+                                  <motion.div
+                                    className="absolute inset-0 w-0.5 h-4 bg-gradient-to-b from-cyan-200 to-purple-300 blur-sm opacity-60"
+                                    animate={{
+                                      opacity: [0.3, 0.8, 0.3],
+                                      scaleY: [0.8, 1.2, 0.8]
+                                    }}
+                                    transition={{
+                                      duration: 1,
+                                      repeat: Infinity,
+                                      ease: "easeInOut",
+                                      delay: 0.2
+                                    }}
+                                  />
+                                </motion.div>
                               )}
-                            </div>
-                            
+                            </motion.div>
+
                             {/* Display attachments */}
                             {message.attachments && message.attachments.length > 0 && (
                               <div className="mt-2 space-y-1">
@@ -353,7 +419,7 @@ export default function AiChat({
           </div>
 
           {/* Selected files display */}
-          {(selectedFiles.length > 0) && (
+          {(selectedFiles.filter(file => !file?.name || !file?.name?.startsWith('canvas-')).length > 0) && (
             <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
               <div className="flex flex-wrap gap-2">
                 {selectedFiles
@@ -420,12 +486,16 @@ export default function AiChat({
                 disabled={isStreaming}
               />
               <Button
-                type="submit"
+                type={isStreaming ? "button" : "submit"}
                 size="icon"
-                disabled={!draft.trim() || isStreaming}
+                disabled={!draft.trim() && !isStreaming}
+                onClick={isStreaming ? () => {
+                  // TODO: Implement stop streaming functionality
+                  console.log('Stop streaming clicked')
+                } : undefined}
                 className="h-8 w-8 rounded-full bg-blue-500 hover:bg-blue-600 text-white"
               >
-                <Send size={18} />
+                {isStreaming ? <StopCircle size={18} /> : <Send size={18} />}
               </Button>
               </div>
             </div>

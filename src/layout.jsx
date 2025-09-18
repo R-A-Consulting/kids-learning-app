@@ -1,77 +1,33 @@
-import { Routes, Route, useLocation, Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import routes from './routes';
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarProvider,
-  SidebarRail,
 } from '@/components/ui/sidebar';
-import { Home, MessageSquare, GraduationCap } from 'lucide-react';
-
-// Menu items for the sidebar (currently empty for dashboard)
-const menuItems = [
-  {
-    title: 'Home',
-    icon: Home,
-    url: '/dashboard',
-  },
-  {
-    title: 'Chats',
-    icon: MessageSquare,
-    url: '/dashboard/chats',
-  },
-];
-
-// Menu items for the sidebar (currently empty for dashboard)
+import { AppSidebar } from '@/components/app-sidebar';
+import { useMe } from '@/services/apis/auth';
+import { Loader2 } from 'lucide-react';
 
 function AppLayout() {
   const location = useLocation();
   const isDashboard = location.pathname.startsWith('/dashboard');
+  const { getCurrentUser, isLoading, user } = useMe();
+
+  useEffect(() => {
+    getCurrentUser();
+  }, []);
+
+  if (isLoading) {
+    return <div className="h-screen w-screen flex items-center justify-center">
+      <Loader2 className="h-10 w-10 animate-spin" />
+    </div>
+  }
 
   return (
     <div className="h-screen w-screen">
       <SidebarProvider>
-        {isDashboard && (
-          <Sidebar collapsible="icon" className="w-[200px]">
-            <SidebarHeader className="items-start p-0">
-              <div className="flex items-center gap-2 px-4 py-4">
-                <GraduationCap className="h-6 w-6 text-primary" />
-                <span className="font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-                  KidsLearn
-                </span>
-              </div>
-            </SidebarHeader>
-
-            <SidebarContent>
-              <SidebarGroup>
-                <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {menuItems.map((item) => (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton asChild>
-                          <Link to={item.url}>
-                            <item.icon className="h-4 w-4" />
-                            <span>{item.title}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            </SidebarContent>
-            <SidebarRail />
-          </Sidebar>
-        )}
+        {isDashboard && <AppSidebar user={user} />}
 
         {isDashboard ? (
           <SidebarInset>
