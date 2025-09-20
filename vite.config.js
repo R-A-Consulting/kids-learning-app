@@ -28,7 +28,7 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api/v1': {
-        target: 'https://learn.steeplogic.com/',
+        target: 'https://node.ismdev.in/',
         changeOrigin: true,
         rewrite: (path) => path,
         configure: (proxy, _options) => {
