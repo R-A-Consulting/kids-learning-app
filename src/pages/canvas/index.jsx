@@ -9,14 +9,14 @@ export default function TldrawApp() {
 
   return (
     <div className="h-screen w-screen flex flex-row bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200">
-      <CustomTldraw
-        sessionId={sessionId}
-        onCanvasImageUpdate={setCanvasToImage}
-      />
       <AIChatPanel
         onDockChange={handleDockChange}
         sessionId={sessionId}
         canvasImage={canvasToImage}
+      />
+      <CustomTldraw
+        sessionId={sessionId}
+        onCanvasImageUpdate={setCanvasToImage}
       />
     </div>
   )

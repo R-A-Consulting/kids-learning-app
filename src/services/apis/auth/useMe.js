@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { GlobalContext } from '@/services/contexts/global-context';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Use proxy in development, full URL in production
 const API_BASE_URL = import.meta.env.DEV ? '/api/v1' : (import.meta.env.VITE_BASE_URL || '');
@@ -10,6 +10,8 @@ export const useMe = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
+  const { pathname } = useLocation();
+
   const navigate = useNavigate();
   const getCurrentUser = useCallback(async () => {
     setIsLoading(true);
@@ -36,6 +38,8 @@ export const useMe = () => {
 
       if (!data.data?.user) {
         navigate('/login');
+      } else if (data.data?.user && (pathname === '/login' || pathname === '/')) {
+        navigate('/dashboard');
       }
 
       return {
@@ -54,7 +58,7 @@ export const useMe = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [setUserGlobal, navigate]);
+  }, [setUserGlobal, navigate, pathname]);
 
   const clearError = useCallback(() => {
     setError(null);
