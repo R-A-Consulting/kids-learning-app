@@ -748,9 +748,6 @@ export default function CustomTldraw({ sessionId, onCanvasImageUpdate }) {
         container.addEventListener('pointerup', handlePointerUp)
       }
 
-      // Add keyboard listener for delete/backspace
-      document.addEventListener('keydown', handleKeyDown)
-
       // Listen to store changes
       const unsubscribe = editor.store.listen(handleStoreChange)
 
@@ -760,7 +757,6 @@ export default function CustomTldraw({ sessionId, onCanvasImageUpdate }) {
           container.removeEventListener('pointerdown', handlePointerDown)
           container.removeEventListener('pointerup', handlePointerUp)
         }
-        document.removeEventListener('keydown', handleKeyDown)
         unsubscribe?.()
         if (exportTimeoutRef.current) {
           clearTimeout(exportTimeoutRef.current)

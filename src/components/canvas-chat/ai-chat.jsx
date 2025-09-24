@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import { Send, Maximize2, Minimize2, Paperclip, X, Sparkles, Loader2, Image, Download, StopCircle } from 'lucide-react'
+import { Send, Maximize2, Minimize2, Paperclip, X, Sparkles, Loader2, Image, Download, StopCircle, ArrowLeft } from 'lucide-react'
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { useExportSessionPdf } from '@/services/apis/sessions'
 import { GlobalContext } from '@/services/contexts/global-context'
 import { motion, AnimatePresence } from 'framer-motion'
 import MessageFormatter from '@/components/canvas-chat/message-formatter'
+import { useNavigate } from 'react-router-dom'
 
 // Shimmer phrases for AI thinking state
 const LOADING_PHRASES = [
@@ -30,6 +31,7 @@ export default function AiChat({
   dockedPosition,
   canvasImage,
 }) {
+  const navigate = useNavigate()
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -209,7 +211,9 @@ export default function AiChat({
         onClick={() => isMinimized && setIsMinimized(false)}
       >
         <div className="flex items-center gap-2">
-          <Sparkles className="h-3 w-3 text-gray-600" />
+          <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-gray-100" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-3 w-3 text-gray-600" />
+          </Button>
           <span className="font-medium text-gray-700 text-xs">Learning Buddy</span>
         </div>
         <div className="flex items-center gap-1">
