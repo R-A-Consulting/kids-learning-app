@@ -394,6 +394,13 @@ export default function AiChat({
                 }
                 return [...prev, audioFile].slice(0, 5)
               })
+
+              setDraft(prevDraft => {
+                if (!prevDraft || prevDraft.trim().length === 0 || prevDraft === 'analyse audio and respond accordingly') {
+                  return 'analyse audio and respond accordingly'
+                }
+                return prevDraft
+              })
             } catch (error) {
               console.error('Failed to normalize recording:', error)
               alert('Recording failed to process. Please try again.')
