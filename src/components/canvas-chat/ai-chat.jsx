@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import { Send, Maximize2, Minimize2, Paperclip, X, Sparkles, Loader2, Image, Download, StopCircle, ArrowLeft } from 'lucide-react'
+import { Send, Maximize2, Minimize2, Paperclip, X, Sparkles, Loader2, Image, Download, StopCircle, ArrowLeft, Mic, Square } from 'lucide-react'
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +23,8 @@ const LOADING_PHRASES = [
   'Gathering thoughts…',
 ]
 
+const RECORDING_WAVE_BARS = Array.from({ length: 7 })
+
 export default function AiChat({
   isMinimized,
   setIsMinimized,
@@ -36,6 +38,9 @@ export default function AiChat({
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
   const streamingMessageIdRef = useRef(null)
+  const mediaRecorderRef = useRef(null)
+  const audioChunksRef = useRef([])
+  const audioStreamRef = useRef(null)
   
   const { user } = GlobalContext()
   const { createStreamingMessage, isStreaming: apiStreaming } = useCreateStreamingMessage()
@@ -47,6 +52,8 @@ export default function AiChat({
   const [currentStreamId, setCurrentStreamId] = useState(null)
   const [selectedFiles, setSelectedFiles] = useState([])
   const [streamingStatusById, setStreamingStatusById] = useState({})
+  const [isRecording, setIsRecording] = useState(false)
+  const isStreaming = Boolean(streamingMessageIdRef.current) || apiStreaming
 
   useEffect(() => {
     setSelectedFiles(prev => {
@@ -105,6 +112,86 @@ export default function AiChat({
   const removeFile = useCallback((index) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index))
   }, [])
+
+  const cleanupAudioStream = useCallback(() => {
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach(track => track.stop())
+      audioStreamRef.current = null
+    }
+  }, [])
+
+  const startRecording = useCallback(async () => {
+    if (isStreaming) return
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      alert('Audio recording is not supported in this browser')
+      return
+    }
+
+    if (selectedFiles.length >= 5) {
+      alert('You can only upload up to 5 files')
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      audioStreamRef.current = stream
+
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.onstop = () => {
+        const mimeType = mediaRecorder.mimeType || 'audio/webm'
+        if (audioChunksRef.current.length > 0) {
+          const blob = new Blob(audioChunksRef.current, { type: mimeType })
+          const randomSuffix = Math.random().toString(36).slice(2, 6)
+          const fileExtension = mimeType.includes('mp4') ? 'm4a' : mimeType.split('/')[1] || 'webm'
+          const audioFile = new File([blob], `voice-query-${randomSuffix}.${fileExtension}`, {
+            type: mimeType,
+          })
+
+          setSelectedFiles(prev => {
+            if (prev.length >= 5) {
+              alert('You can only upload up to 5 files')
+              return prev
+            }
+            return [...prev, audioFile].slice(0, 5)
+          })
+        }
+
+        audioChunksRef.current = []
+        cleanupAudioStream()
+        mediaRecorderRef.current = null
+        setIsRecording(false)
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+    } catch (error) {
+      console.error('Error accessing microphone:', error)
+      alert('Unable to start recording. Please check microphone permissions.')
+      cleanupAudioStream()
+      mediaRecorderRef.current = null
+      audioChunksRef.current = []
+      setIsRecording(false)
+    }
+  }, [cleanupAudioStream, isStreaming, selectedFiles.length])
+
+  const stopRecording = useCallback(() => {
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop()
+    } else {
+      cleanupAudioStream()
+      setIsRecording(false)
+    }
+  }, [cleanupAudioStream])
 
   // Handle PDF export
   const handleExportPdf = useCallback(async () => {
@@ -197,7 +284,14 @@ export default function AiChat({
     }
   }, [isMinimized])
 
-  const isStreaming = Boolean(streamingMessageIdRef.current) || apiStreaming
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop()
+      }
+      cleanupAudioStream()
+    }
+  }, [cleanupAudioStream])
 
   return (
     <>
@@ -454,14 +548,30 @@ export default function AiChat({
             onSubmit={(e) => {
               e.preventDefault()
               handleSend(e, true)
-              setSelectedFiles([canvasImage])
+              setSelectedFiles(canvasImage ? [canvasImage] : [])
               setDraft('')
             }}
-            className="mx-2 rounded-full border border-gray-100 bg-slate-50 mb-2"
+            className={cn(
+              "mx-2 rounded-full border border-gray-100 bg-slate-50 mb-2",
+              isRecording && "border-red-400 bg-red-50 animate-pulse"
+            )}
           >
             
             <div className="p-1">
               <div className="flex gap-0 items-center">
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={isStreaming}
+                className={cn(
+                  "h-8 w-8 rounded-full mr-1",
+                  isRecording ? "bg-red-500 hover:bg-red-600 text-white border-red-500" : ""
+                )}
+              >
+                {isRecording ? <Square size={18} /> : <Mic size={18} />}
+              </Button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -475,24 +585,49 @@ export default function AiChat({
                 size="icon"
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isStreaming || selectedFiles.length >= 5}
+                disabled={isStreaming || selectedFiles.length >= 5 || isRecording}
                 className="h-8 w-8 rounded-full"
               >
                 <Paperclip size={18} />
               </Button>
-              <Input
-                ref={inputRef}
-                type="text"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="Type your message..."
-                className="flex-1 h-8 text-xs placeholder:text-xs ring-none outline-none border-none shadow-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                disabled={isStreaming}
-              />
+              <div className="relative flex-1 h-8 flex items-center">
+                <Input
+                  ref={inputRef}
+                  type="text"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder={isRecording ? "Recording..." : "Type your message..."}
+                  className={cn(
+                    "flex-1 h-8 text-xs placeholder:text-xs ring-none outline-none border-none shadow-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0",
+                    isRecording && "opacity-0 pointer-events-none select-none"
+                  )}
+                  disabled={isStreaming || isRecording}
+                />
+                {isRecording && (
+                  <div className="absolute inset-0 flex items-center justify-center gap-1 px-3">
+                    {RECORDING_WAVE_BARS.map((_, index) => (
+                      <motion.span
+                        key={index}
+                        className="w-[3px] h-4 rounded-full bg-red-500"
+                        animate={{
+                          scaleY: [0.4, 1.2, 0.6],
+                          opacity: [0.6, 1, 0.6],
+                        }}
+                        transition={{
+                          duration: 0.8,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                          delay: index * 0.1,
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
               <Button
                 type={isStreaming ? "button" : "submit"}
                 size="icon"
-                disabled={!draft.trim() && !isStreaming}
+                disabled={(!draft.trim() && !isStreaming) || isRecording}
                 onClick={isStreaming ? () => {
                   // TODO: Implement stop streaming functionality
                   console.log('Stop streaming clicked')
