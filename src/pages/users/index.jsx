@@ -168,7 +168,7 @@ export default function UsersPage() {
           <h1 className="text-sm font-medium text-gray-700">Users Management</h1>
         </div>
 
-        <Button variant="outline" size="sm" className="ml-auto" onClick={() => {
+        <Button variant="soft" size="sm" className="ml-auto bg-blue-500 text-white" onClick={() => {
           setSelectedUser(null);
           setFormData({ name: '', email: '', role: 'user' });
           setFormErrors({});
