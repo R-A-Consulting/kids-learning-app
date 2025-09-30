@@ -1,9 +1,10 @@
 import * as React from "react"
-import { Link } from 'react-router-dom';
-import { Home, MessageSquare, GraduationCap } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { GraduationCap, Home, LogOut, MessageSquare, Users as UsersIcon } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -13,6 +14,8 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
+import { GlobalContext } from '@/services/contexts/global-context';
 
 // Menu items for the sidebar (currently empty for dashboard)
 const menuItems = [
@@ -20,15 +23,47 @@ const menuItems = [
     title: 'Home',
     icon: Home,
     url: '/dashboard',
-  },
-  {
-    title: 'Chats',
-    icon: MessageSquare,
-    url: '/dashboard/chats',
-  },
+  }
 ];
 
-export function AppSidebar() {
+export function AppSidebar({ user }) {
+  const { setUser } = GlobalContext();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = React.useCallback(() => {
+    // Clear all cookies (including those with different paths)
+    document.cookie.split(';').forEach((cookie) => {
+      const eqPos = cookie.indexOf('=');
+      const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+
+      // Remove cookie for current path
+      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+
+      // Attempt to remove cookie for root and current path
+      const pathParts = location.pathname.split('/');
+      let path = '';
+      for (let i = 0; i < pathParts.length; i++) {
+        path = path + (path.endsWith('/') ? '' : '/') + pathParts[i];
+        if (path) {
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path}`;
+        }
+      }
+    });
+
+    // Clear storage and global state
+    localStorage.removeItem('user');
+    sessionStorage.clear();
+    setUser(null);
+
+    navigate('/login');
+  }, [navigate, setUser, location.pathname]);
+
+  const isActivePath = React.useCallback(
+    (path) => location.pathname === path,
+    [location.pathname]
+  );
+
   return (
     <Sidebar collapsible="icon" className="w-[200px]" >
       <SidebarHeader className="items-start p-0">
@@ -47,7 +82,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild isActive={isActivePath(item.url)}>
                     <Link to={item.url}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
@@ -58,7 +93,35 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {user?.role === 'admin' && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Admin</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={isActivePath('/dashboard/users')}>
+                    <Link to="/dashboard/users">
+                      <UsersIcon className="h-4 w-4" />
+                      <span>Users</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
+      <SidebarFooter className="mt-auto">
+        <Button
+          variant="ghost"
+          className="justify-start gap-2"
+          onClick={handleLogout}
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Logout</span>
+        </Button>
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar >
   );

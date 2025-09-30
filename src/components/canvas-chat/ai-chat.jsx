@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
-import { Send, Maximize2, Minimize2, Paperclip, X, Sparkles, Loader2, Image, Download, StopCircle, ArrowLeft, Mic, Square } from 'lucide-react'
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { Send, Maximize2, Minimize2, Paperclip, X, Sparkles, Loader2, Image, Download, StopCircle, ArrowLeft, Mic, Square, Play, Pause } from 'lucide-react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -53,7 +53,33 @@ export default function AiChat({
   const [selectedFiles, setSelectedFiles] = useState([])
   const [streamingStatusById, setStreamingStatusById] = useState({})
   const [isRecording, setIsRecording] = useState(false)
+  const [playingAudioKey, setPlayingAudioKey] = useState(null)
+  const [audioPreviews, setAudioPreviews] = useState({})
   const isStreaming = Boolean(streamingMessageIdRef.current) || apiStreaming
+  const audioRefs = useRef({})
+  const audioPreviewsRef = useRef(audioPreviews)
+
+  const isAudioFile = useCallback((file) => {
+    if (!file) return false
+    const name = file?.name || ''
+    return (
+      file?.type?.startsWith('audio') ||
+      name.startsWith('voice-query-') ||
+      /\.(mp3|m4a|aac|wav|ogg|webm|flac)$/i.test(name)
+    )
+  }, [])
+
+  const getAudioKey = useCallback((file) => {
+    if (!file) return ''
+    const name = file?.name || 'file'
+    const modified = file?.lastModified || 'na'
+    const size = file?.size || 'size'
+    return `${name}-${modified}-${size}`
+  }, [])
+
+  useEffect(() => {
+    audioPreviewsRef.current = audioPreviews
+  }, [audioPreviews])
 
   useEffect(() => {
     setSelectedFiles(prev => {
@@ -110,8 +136,23 @@ export default function AiChat({
 
   // Remove selected file
   const removeFile = useCallback((index) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
-  }, [])
+    setSelectedFiles(prev => {
+      const next = prev.filter((_, i) => i !== index)
+      const removed = prev[index]
+      if (isAudioFile(removed)) {
+        const key = getAudioKey(removed)
+        const audioEl = audioRefs.current[key]
+        if (audioEl) {
+          audioEl.pause()
+          audioEl.currentTime = 0
+        }
+        if (playingAudioKey === key) {
+          setPlayingAudioKey(null)
+        }
+      }
+      return next
+    })
+  }, [getAudioKey, isAudioFile, playingAudioKey])
 
   const cleanupAudioStream = useCallback(() => {
     if (audioStreamRef.current) {
@@ -201,16 +242,25 @@ export default function AiChat({
   }, [sessionId, exportSessionPdf])
 
   // Handle sending messages
+  const hasAudioAttachment = useMemo(
+    () => selectedFiles.some(file => isAudioFile(file)),
+    [selectedFiles, isAudioFile]
+  )
+
   const handleSend = useCallback(async (e) => {
     e?.preventDefault()
     const text = draft.trim()
-    if (!text || streamingMessageIdRef.current || !sessionId) return
+    if ((!text && !hasAudioAttachment) || streamingMessageIdRef.current || !sessionId) return
     
     // Add user message immediately
+    const visibleAttachments = selectedFiles
+      .filter(file => !file?.name?.startsWith('canvas-'))
+      .map(file => ({ filename: file?.name || 'file' }))
     const userMessage = { 
       id: `user-${Date.now()}`, 
       role: 'user', 
-      text 
+      text,
+      attachments: visibleAttachments
     }
     setMessages(prev => [...prev, userMessage])
 
@@ -275,7 +325,7 @@ export default function AiChat({
       streamingMessageIdRef.current = null
       setCurrentStreamId(null)
     }
-  }, [draft, sessionId, user?._id, user?.id, selectedFiles, createStreamingMessage])
+  }, [draft, hasAudioAttachment, sessionId, user?._id, user?.id, selectedFiles, createStreamingMessage])
 
   // Focus input when expanded
   useEffect(() => {
@@ -290,8 +340,92 @@ export default function AiChat({
         mediaRecorderRef.current.stop()
       }
       cleanupAudioStream()
+      Object.values(audioPreviewsRef.current).forEach(entry => {
+        if (entry?.url) {
+          URL.revokeObjectURL(entry.url)
+        }
+      })
     }
   }, [cleanupAudioStream])
+
+  useEffect(() => {
+    const previousMap = audioPreviewsRef.current || {}
+    const nextMap = {}
+    const activeKeys = new Set()
+
+    selectedFiles.forEach(file => {
+      if (!isAudioFile(file)) return
+      const key = getAudioKey(file)
+      if (!key) return
+      activeKeys.add(key)
+
+      const existing = previousMap[key]
+      if (existing && existing.file === file) {
+        nextMap[key] = existing
+      } else {
+        const url = URL.createObjectURL(file)
+        nextMap[key] = { file, url }
+      }
+    })
+
+    Object.keys(previousMap).forEach(key => {
+      if (!activeKeys.has(key)) {
+        const entry = previousMap[key]
+        if (entry?.url) {
+          URL.revokeObjectURL(entry.url)
+        }
+      }
+    })
+
+    audioPreviewsRef.current = nextMap
+    setAudioPreviews(nextMap)
+
+    Object.keys(audioRefs.current).forEach(key => {
+      if (!activeKeys.has(key)) {
+        delete audioRefs.current[key]
+      }
+    })
+
+    if (playingAudioKey && !activeKeys.has(playingAudioKey)) {
+      setPlayingAudioKey(null)
+    }
+  }, [selectedFiles, getAudioKey, isAudioFile, playingAudioKey])
+
+  const handleToggleAudioPlayback = useCallback((key) => {
+    if (!key) return
+    const audioElement = audioRefs.current[key]
+    if (!audioElement) return
+
+    const isCurrentPlaying = playingAudioKey === key && !audioElement.paused
+
+    if (isCurrentPlaying) {
+      audioElement.pause()
+      audioElement.currentTime = 0
+      setPlayingAudioKey(null)
+      return
+    }
+
+    if (playingAudioKey && playingAudioKey !== key) {
+      const current = audioRefs.current[playingAudioKey]
+      if (current) {
+        current.pause()
+        current.currentTime = 0
+      }
+    }
+
+    const playPromise = audioElement.play()
+    if (playPromise && typeof playPromise.then === 'function') {
+      playPromise
+        .then(() => {
+          setPlayingAudioKey(key)
+        })
+        .catch(error => {
+          console.error('Audio playback failed:', error)
+        })
+    } else {
+      setPlayingAudioKey(key)
+    }
+  }, [playingAudioKey])
 
   return (
     <>
@@ -517,17 +651,53 @@ export default function AiChat({
           </div>
 
           {/* Selected files display */}
-          {(selectedFiles.filter(file => !file?.name || !file?.name?.startsWith('canvas-')).length > 0) && (
+          {(selectedFiles.filter(file => !file?.name?.startsWith('canvas-')).length > 0) && (
             <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
               <div className="flex flex-wrap gap-2">
                 {selectedFiles
-                  .filter(file => !file?.name || !file?.name?.startsWith('canvas-'))
+                  .filter(file => !file?.name?.startsWith('canvas-'))
                   .map((file, index) => (
                   <div
                     key={index}
                     className="flex items-center gap-1 px-2 py-1 bg-white border border-gray-200 rounded text-xs"
                   >
-                    <Paperclip className="h-3 w-3 text-gray-500" />
+                    {isAudioFile(file) ? null : <Paperclip className="h-3 w-3 text-gray-500" />}
+                    {isAudioFile(file) && (() => {
+                      const key = getAudioKey(file)
+                      const previewEntry = key ? audioPreviews[key] : null
+
+                      if (!key || !previewEntry?.url) {
+                        return null
+                      }
+
+                      return (
+                        <>
+                          <audio
+                            ref={node => {
+                              if (node) {
+                                audioRefs.current[key] = node
+                              } else {
+                                delete audioRefs.current[key]
+                              }
+                            }}
+                            src={previewEntry.url}
+                            className="hidden"
+                            onEnded={() => {
+                              setPlayingAudioKey(prev => (prev === key ? null : prev))
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-5 w-5"
+                            onClick={() => handleToggleAudioPlayback(key)}
+                          >
+                            {playingAudioKey === key ? <Pause className="h-2.5 w-2.5" strokeWidth={1.5} /> : <Play className="h-2.5 w-2.5" strokeWidth={1.5} />}
+                          </Button>
+                        </>
+                      )
+                    })()}
                     <span className="max-w-[100px] truncate">{file?.name || 'file'}</span>
                     <Button
                       variant="ghost"
@@ -627,7 +797,7 @@ export default function AiChat({
               <Button
                 type={isStreaming ? "button" : "submit"}
                 size="icon"
-                disabled={(!draft.trim() && !isStreaming) || isRecording}
+                disabled={(!draft.trim() && !hasAudioAttachment && !isStreaming) || isRecording}
                 onClick={isStreaming ? () => {
                   // TODO: Implement stop streaming functionality
                   console.log('Stop streaming clicked')

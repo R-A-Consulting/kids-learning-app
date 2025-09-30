@@ -1,6 +1,7 @@
 import Canvas from './pages/canvas';
 import LoginPage from './pages/login';
 import DashboardPage from './pages/dashboard';
+import UsersPage from './pages/users';
 
 const routes = [
   {
@@ -18,6 +19,10 @@ const routes = [
   {
     path: '/dashboard',
     element: <DashboardPage />,
+  },
+  {
+    path: '/dashboard/users',
+    element: <UsersPage />,
   },
 ];
 
