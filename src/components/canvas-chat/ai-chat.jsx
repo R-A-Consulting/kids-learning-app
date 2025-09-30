@@ -101,6 +101,107 @@ const encodeAudioBufferToWav = (audioBuffer) => {
   return buffer
 }
 
+// Streaming Message Component with smooth animation
+const StreamingMessage = ({ text }) => {
+  const [displayedText, setDisplayedText] = useState('')
+  const [showCursor, setShowCursor] = useState(true)
+  const targetTextRef = useRef('')
+  const displayedPosRef = useRef(0)
+  const animationFrameRef = useRef()
+  const lastFrameTimeRef = useRef(0)
+  const charsPerSecond = 25 // Characters per second (adjust for speed)
+  
+  useEffect(() => {
+    // Update target text whenever prop changes
+    targetTextRef.current = text || ''
+    
+    // Start or continue animation
+    const startAnimation = () => {
+      if (animationFrameRef.current) return // Already animating
+      
+      const animate = (timestamp) => {
+        // Initialize timestamp on first frame
+        if (!lastFrameTimeRef.current) {
+          lastFrameTimeRef.current = timestamp
+        }
+        
+        // Calculate how many characters to show based on elapsed time
+        const elapsed = timestamp - lastFrameTimeRef.current
+        const charsToAdd = Math.floor((elapsed / 1000) * charsPerSecond)
+        
+        if (charsToAdd > 0 && displayedPosRef.current < targetTextRef.current.length) {
+          // Update position and displayed text
+          const newPos = Math.min(
+            displayedPosRef.current + charsToAdd,
+            targetTextRef.current.length
+          )
+          displayedPosRef.current = newPos
+          setDisplayedText(targetTextRef.current.slice(0, newPos))
+          lastFrameTimeRef.current = timestamp
+        }
+        
+        // Continue animation if there's more to show
+        if (displayedPosRef.current < targetTextRef.current.length) {
+          animationFrameRef.current = requestAnimationFrame(animate)
+        } else {
+          // Animation complete
+          animationFrameRef.current = null
+          setShowCursor(false)
+        }
+      }
+      
+      // Start the animation
+      animationFrameRef.current = requestAnimationFrame(animate)
+    }
+    
+    // Check if we need to animate
+    if (targetTextRef.current.length > displayedPosRef.current) {
+      setShowCursor(true)
+      startAnimation()
+    }
+    
+    // Handle edge case: text shortened (shouldn't happen in streaming)
+    if (text && text.length < displayedPosRef.current) {
+      displayedPosRef.current = text.length
+      setDisplayedText(text)
+      lastFrameTimeRef.current = 0
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+      setShowCursor(false)
+    }
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+    }
+  }, [text])
+  
+  return (
+    <div className="relative inline">
+      <MessageFormatter className="text-xs inline">
+        {displayedText}
+      </MessageFormatter>
+      {showCursor && (
+        <motion.span
+          className="inline-block ml-0.5 w-[2px] h-[14px] bg-blue-500 align-text-bottom"
+          animate={{
+            opacity: [1, 0.2, 1],
+          }}
+          transition={{
+            duration: 0.8,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
 const decodeAudioDataAsync = (audioContext, arrayBuffer) =>
   new Promise((resolve, reject) => {
     audioContext.decodeAudioData(arrayBuffer, resolve, reject)
@@ -179,6 +280,7 @@ export default function AiChat({
   const [isRecording, setIsRecording] = useState(false)
   const [playingAudioKey, setPlayingAudioKey] = useState(null)
   const [audioPreviews, setAudioPreviews] = useState({})
+  const [shouldAutoSendAfterRecording, setShouldAutoSendAfterRecording] = useState(false)
   const isStreaming = Boolean(streamingMessageIdRef.current) || apiStreaming
   const audioRefs = useRef({})
   const audioPreviewsRef = useRef(audioPreviews)
@@ -271,34 +373,7 @@ export default function AiChat({
       for (const file of fileList) {
         if (!file) continue
 
-        const lowerMime = sanitizeMimeType(file.type)
-        const lowerExt = getFileExtension(file.name)
-        const isLikelyAudio = lowerMime.startsWith('audio') || lowerExt || file.name?.startsWith('voice-query-')
-
-        if (isLikelyAudio) {
-          let finalFile = file
-
-          if (!isAudioFile(file)) {
-            try {
-              const { blob: normalizedBlob, mimeType, extension } = await normalizeAudioBlobToSupportedFormat(file)
-              const baseName = (file.name || 'audio').replace(/\.[^/.]+$/, '') || 'audio'
-              finalFile = new File([normalizedBlob], `${baseName}.${extension}`, { type: mimeType })
-            } catch (error) {
-              console.error('Unsupported audio file selected:', error)
-              alert('Only MP3 or WAV audio files are supported.')
-              continue
-            }
-          }
-
-          if (!isAudioFile(finalFile)) {
-            alert('Only MP3 or WAV audio files are supported.')
-            continue
-          }
-
-          processedFiles.push(finalFile)
-          continue
-        }
-
+        // Just add all files without audio format restrictions
         processedFiles.push(file)
       }
 
@@ -314,7 +389,7 @@ export default function AiChat({
     }
 
     processFiles()
-  }, [isAudioFile])
+  }, [])
 
   // Remove selected file
   const removeFile = useCallback((index) => {
@@ -396,11 +471,22 @@ export default function AiChat({
               })
 
               setDraft(prevDraft => {
-                if (!prevDraft || prevDraft.trim().length === 0 || prevDraft === 'analyse audio and respond accordingly') {
-                  return 'analyse audio and respond accordingly'
+                if (!prevDraft || prevDraft.trim().length === 0 || prevDraft === 'analyse audio and respond accordingly' || prevDraft === 'help') {
+                  return 'help'
                 }
                 return prevDraft
               })
+              
+              // Auto-send if flagged
+              if (shouldAutoSendAfterRecording) {
+                setTimeout(() => {
+                  const sendButton = document.querySelector('[data-send-button="true"]')
+                  if (sendButton) {
+                    sendButton.click()
+                  }
+                  setShouldAutoSendAfterRecording(false)
+                }, 100)
+              }
             } catch (error) {
               console.error('Failed to normalize recording:', error)
               alert('Recording failed to process. Please try again.')
@@ -432,17 +518,48 @@ export default function AiChat({
       audioChunksRef.current = []
       setIsRecording(false)
     }
-  }, [cleanupAudioStream, isStreaming, selectedFiles.length])
+  }, [cleanupAudioStream, isStreaming, selectedFiles.length, shouldAutoSendAfterRecording])
 
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback((shouldSave = true) => {
     const recorder = mediaRecorderRef.current
-    if (recorder && recorder.state !== 'inactive') {
-      recorder.stop()
+    
+    if (!shouldSave) {
+      // Cancel recording - discard everything
+      if (recorder && recorder.state !== 'inactive') {
+        recorder.onstop = () => {
+          audioChunksRef.current = []
+          cleanupAudioStream()
+          mediaRecorderRef.current = null
+          setIsRecording(false)
+        }
+        recorder.stop()
+      } else {
+        audioChunksRef.current = []
+        cleanupAudioStream()
+        mediaRecorderRef.current = null
+        setIsRecording(false)
+      }
     } else {
-      cleanupAudioStream()
-      setIsRecording(false)
+      // Normal stop - save the recording
+      if (recorder && recorder.state !== 'inactive') {
+        recorder.stop()
+      } else {
+        cleanupAudioStream()
+        setIsRecording(false)
+      }
     }
   }, [cleanupAudioStream])
+  
+  const cancelRecording = useCallback(() => {
+    stopRecording(false)
+  }, [stopRecording])
+  
+  const sendRecording = useCallback(() => {
+    setShouldAutoSendAfterRecording(true)
+    stopRecording(true)
+    // The audio will be added to selectedFiles via the onstop handler
+    // We'll trigger send after the recording is processed
+  }, [stopRecording])
 
   // Handle PDF export
   const handleExportPdf = useCallback(async () => {
@@ -511,6 +628,14 @@ export default function AiChat({
               isStreaming: chunkData.eventType !== 'complete'
             } : m
           ))
+          // Clear the loading status when actual content arrives
+          if (accumulated && accumulated.trim()) {
+            setStreamingStatusById(prev => {
+              const newStatus = { ...prev }
+              delete newStatus[assistantId]
+              return newStatus
+            })
+          }
         }
 
         if (chunkData.eventType === 'complete') {
@@ -785,51 +910,19 @@ export default function AiChat({
                           </div>
                         ) : (
                           <>
-                            {/* Message content with instant streaming */}
+                            {/* Message content with smooth streaming animation */}
                             <motion.div
                               className="relative"
                               initial={false}
                               animate={{ opacity: 1 }}
                               transition={{ duration: 0.3 }}
                             >
-                              <MessageFormatter className="text-xs">
-                                {message.text}
-                              </MessageFormatter>
-
-                              {/* Streaming indicator */}
-                              {message.isStreaming && streamingMessageIdRef.current === message.id && (
-                                <motion.div className="relative inline-block ml-0.5">
-                                  <motion.span
-                                    className="inline-block w-0.5 h-4 bg-gradient-to-b from-cyan-300 via-blue-400 to-purple-500"
-                                    animate={{
-                                      opacity: [0.4, 1, 0.4],
-                                      scaleY: [0.7, 1.3, 0.7]
-                                    }}
-                                    transition={{
-                                      duration: 1,
-                                      repeat: Infinity,
-                                      ease: "easeInOut"
-                                    }}
-                                    style={{
-                                      backgroundSize: '200% 200%',
-                                      backgroundImage: 'linear-gradient(45deg, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #06b6d4)'
-                                    }}
-                                  />
-                                  {/* Glow effect */}
-                                  <motion.div
-                                    className="absolute inset-0 w-0.5 h-4 bg-gradient-to-b from-cyan-200 to-purple-300 blur-sm opacity-60"
-                                    animate={{
-                                      opacity: [0.3, 0.8, 0.3],
-                                      scaleY: [0.8, 1.2, 0.8]
-                                    }}
-                                    transition={{
-                                      duration: 1,
-                                      repeat: Infinity,
-                                      ease: "easeInOut",
-                                      delay: 0.2
-                                    }}
-                                  />
-                                </motion.div>
+                              {message.isStreaming && streamingMessageIdRef.current === message.id ? (
+                                <StreamingMessage text={message.text} />
+                              ) : (
+                                <MessageFormatter className="text-xs">
+                                  {message.text}
+                                </MessageFormatter>
                               )}
                             </motion.div>
 
@@ -933,50 +1026,74 @@ export default function AiChat({
             }}
             className={cn(
               "mx-2 rounded-full border border-gray-100 bg-slate-50 mb-2",
-              isRecording && "border-red-400 bg-red-50 animate-pulse"
+              isRecording && "border-red-400 bg-red-50"
             )}
           >
             
             <div className="p-1">
               <div className="flex gap-0 items-center">
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={isStreaming}
-                className={cn(
-                  "h-8 w-8 rounded-full mr-1",
-                  isRecording ? "bg-red-500 hover:bg-red-600 text-white border-red-500" : ""
-                )}
-              >
-                {isRecording ? <Square size={18} /> : <Mic size={18} />}
-              </Button>
+              {!isRecording ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={startRecording}
+                  disabled={isStreaming}
+                  className="h-8 w-8 rounded-full mr-1"
+                >
+                  <Mic size={18} />
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={cancelRecording}
+                    className="px-3 py-1 h-8 rounded-full mr-1 bg-gray-100 hover:bg-gray-200 text-xs"
+                    title="Cancel recording"
+                  >
+                    <X size={14} className="mr-1" />
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={sendRecording}
+                    className="px-3 py-1 h-8 rounded-full mr-1 bg-blue-500 hover:bg-blue-600 text-white border-blue-500 text-xs"
+                    title="Send recording"
+                  >
+                    <Send size={14} className="mr-1" />
+                    Send
+                  </Button>
+                </>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept="image/*,application/pdf,.doc,.docx,.txt"
+                accept="image/*,audio/*,application/pdf,.doc,.docx,.txt"
                 onChange={handleFileSelect}
                 className="hidden"
               />
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isStreaming || selectedFiles.length >= 5 || isRecording}
-                className="h-8 w-8 rounded-full"
-              >
-                <Paperclip size={18} />
-              </Button>
+              {!isRecording && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isStreaming || selectedFiles.length >= 5}
+                  className="h-8 w-8 rounded-full"
+                >
+                  <Paperclip size={18} />
+                </Button>
+              )}
               <div className="relative flex-1 h-8 flex items-center">
                 <Input
                   ref={inputRef}
                   type="text"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder={isRecording ? "Recording..." : "Type your message..."}
+                  placeholder={isRecording ? "" : "Type your message..."}
                   className={cn(
                     "flex-1 h-8 text-xs placeholder:text-xs ring-none outline-none border-none shadow-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0",
                     isRecording && "opacity-0 pointer-events-none select-none"
@@ -1004,18 +1121,21 @@ export default function AiChat({
                   </div>
                 )}
               </div>
-              <Button
-                type={isStreaming ? "button" : "submit"}
-                size="icon"
-                disabled={(!draft.trim() && !hasAudioAttachment && !isStreaming) || isRecording}
-                onClick={isStreaming ? () => {
-                  // TODO: Implement stop streaming functionality
-                  console.log('Stop streaming clicked')
-                } : undefined}
-                className="h-8 w-8 rounded-full bg-blue-500 hover:bg-blue-600 text-white"
-              >
-                {isStreaming ? <StopCircle size={18} /> : <Send size={18} />}
-              </Button>
+              {!isRecording && (
+                <Button
+                  type={isStreaming ? "button" : "submit"}
+                  size="icon"
+                  disabled={(!draft.trim() && !hasAudioAttachment && !isStreaming)}
+                  onClick={isStreaming ? () => {
+                    // TODO: Implement stop streaming functionality
+                    console.log('Stop streaming clicked')
+                  } : undefined}
+                  className="h-8 w-8 rounded-full bg-blue-500 hover:bg-blue-600 text-white"
+                  data-send-button="true"
+                >
+                  {isStreaming ? <StopCircle size={18} /> : <Send size={18} />}
+                </Button>
+              )}
               </div>
             </div>
           </form>
