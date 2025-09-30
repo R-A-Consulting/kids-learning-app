@@ -471,8 +471,8 @@ export default function AiChat({
               })
 
               setDraft(prevDraft => {
-                if (!prevDraft || prevDraft.trim().length === 0 || prevDraft === 'analyse audio and respond accordingly' || prevDraft === 'help') {
-                  return 'help'
+                if (!prevDraft || prevDraft.trim().length === 0 || prevDraft === 'analyse audio and respond accordingly') {
+                  return 'analyse audio and respond accordingly'
                 }
                 return prevDraft
               })
