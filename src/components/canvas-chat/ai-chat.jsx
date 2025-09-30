@@ -25,6 +25,130 @@ const LOADING_PHRASES = [
 
 const RECORDING_WAVE_BARS = Array.from({ length: 7 })
 
+const SUPPORTED_AUDIO_EXTENSIONS = ['mp3', 'wav']
+const SUPPORTED_AUDIO_MIME_TYPES = [
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/wave',
+]
+
+const getFileExtension = (filename = '') => {
+  const parts = filename.split('.')
+  if (parts.length <= 1) return ''
+  return parts.pop().toLowerCase()
+}
+
+const sanitizeMimeType = (mime = '') => (mime || '').split(';')[0].toLowerCase()
+
+const encodeAudioBufferToWav = (audioBuffer) => {
+  const numChannels = audioBuffer.numberOfChannels || 1
+  const sampleRate = audioBuffer.sampleRate
+  const samples = audioBuffer.length
+  const bytesPerSample = 2 // 16-bit PCM
+  const blockAlign = numChannels * bytesPerSample
+  const dataSize = samples * blockAlign
+  const buffer = new ArrayBuffer(44 + dataSize)
+  const view = new DataView(buffer)
+
+  let offset = 0
+  const writeString = (string) => {
+    for (let i = 0; i < string.length; i += 1) {
+      view.setUint8(offset, string.charCodeAt(i))
+      offset += 1
+    }
+  }
+
+  writeString('RIFF')
+  view.setUint32(offset, 36 + dataSize, true)
+  offset += 4
+  writeString('WAVE')
+  writeString('fmt ')
+  view.setUint32(offset, 16, true)
+  offset += 4
+  view.setUint16(offset, 1, true) // PCM format
+  offset += 2
+  view.setUint16(offset, numChannels, true)
+  offset += 2
+  view.setUint32(offset, sampleRate, true)
+  offset += 4
+  view.setUint32(offset, sampleRate * blockAlign, true)
+  offset += 4
+  view.setUint16(offset, blockAlign, true)
+  offset += 2
+  view.setUint16(offset, bytesPerSample * 8, true)
+  offset += 2
+  writeString('data')
+  view.setUint32(offset, dataSize, true)
+  offset += 4
+
+  const channelData = []
+  for (let channel = 0; channel < numChannels; channel += 1) {
+    channelData[channel] = audioBuffer.getChannelData(channel)
+  }
+
+  for (let i = 0; i < samples; i += 1) {
+    for (let channel = 0; channel < numChannels; channel += 1) {
+      let sample = channelData[channel][i]
+      sample = Math.max(-1, Math.min(1, sample))
+      const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff
+      view.setInt16(offset, intSample, true)
+      offset += 2
+    }
+  }
+
+  return buffer
+}
+
+const decodeAudioDataAsync = (audioContext, arrayBuffer) =>
+  new Promise((resolve, reject) => {
+    audioContext.decodeAudioData(arrayBuffer, resolve, reject)
+  })
+
+const convertBlobToWav = async (blob) => {
+  const AudioCtx = window?.AudioContext || window?.webkitAudioContext
+  if (!AudioCtx) {
+    throw new Error('AudioContextNotSupported')
+  }
+
+  const arrayBuffer = await blob.arrayBuffer()
+  const audioContext = new AudioCtx()
+  try {
+    const audioBuffer = await decodeAudioDataAsync(audioContext, arrayBuffer)
+    const wavBuffer = encodeAudioBufferToWav(audioBuffer)
+    return new Blob([wavBuffer], { type: 'audio/wav' })
+  } finally {
+    if (audioContext?.state !== 'closed') {
+      try {
+        await audioContext.close()
+      } catch (error) {
+        console.warn('Failed to close AudioContext:', error)
+      }
+    }
+  }
+}
+
+const normalizeAudioBlobToSupportedFormat = async (blob) => {
+  const incomingMime = sanitizeMimeType(blob?.type)
+
+  if (SUPPORTED_AUDIO_MIME_TYPES.includes(incomingMime)) {
+    const extension = incomingMime.includes('mpeg') || incomingMime.includes('mp3') ? 'mp3' : 'wav'
+    return {
+      blob,
+      mimeType: incomingMime,
+      extension,
+    }
+  }
+
+  const wavBlob = await convertBlobToWav(blob)
+  return {
+    blob: wavBlob,
+    mimeType: 'audio/wav',
+    extension: 'wav',
+  }
+}
+
 export default function AiChat({
   isMinimized,
   setIsMinimized,
@@ -61,12 +185,17 @@ export default function AiChat({
 
   const isAudioFile = useCallback((file) => {
     if (!file) return false
-    const name = file?.name || ''
-    return (
-      file?.type?.startsWith('audio') ||
-      name.startsWith('voice-query-') ||
-      /\.(mp3|m4a|aac|wav|ogg|webm|flac)$/i.test(name)
-    )
+    const name = (file?.name || '').toLowerCase()
+    const mimeType = sanitizeMimeType(file?.type)
+    const extension = getFileExtension(name)
+
+    if (SUPPORTED_AUDIO_MIME_TYPES.includes(mimeType)) return true
+    if (SUPPORTED_AUDIO_EXTENSIONS.includes(extension)) return true
+    if (name.startsWith('voice-query-')) {
+      return SUPPORTED_AUDIO_EXTENSIONS.some(ext => name.endsWith(`.${ext}`))
+    }
+
+    return false
   }, [])
 
   const getAudioKey = useCallback((file) => {
@@ -125,14 +254,67 @@ export default function AiChat({
 
 
   // Handle file selection
-  const handleFileSelect = useCallback((e) => {
-    const files = Array.from(e.target.files || [])
-    if (selectedFiles.length + files.length > 5) {
-      alert('You can only upload up to 5 files')
-      return
+  const handleFileSelect = useCallback((event) => {
+    const input = event?.target
+    const fileList = Array.from(input?.files || [])
+
+    // Allow re-selecting the same file by clearing the input value
+    if (input) {
+      input.value = ''
     }
-    setSelectedFiles(prev => [...prev, ...files].slice(0, 5))
-  }, [selectedFiles])
+
+    if (fileList.length === 0) return
+
+    const processFiles = async () => {
+      const processedFiles = []
+
+      for (const file of fileList) {
+        if (!file) continue
+
+        const lowerMime = sanitizeMimeType(file.type)
+        const lowerExt = getFileExtension(file.name)
+        const isLikelyAudio = lowerMime.startsWith('audio') || lowerExt || file.name?.startsWith('voice-query-')
+
+        if (isLikelyAudio) {
+          let finalFile = file
+
+          if (!isAudioFile(file)) {
+            try {
+              const { blob: normalizedBlob, mimeType, extension } = await normalizeAudioBlobToSupportedFormat(file)
+              const baseName = (file.name || 'audio').replace(/\.[^/.]+$/, '') || 'audio'
+              finalFile = new File([normalizedBlob], `${baseName}.${extension}`, { type: mimeType })
+            } catch (error) {
+              console.error('Unsupported audio file selected:', error)
+              alert('Only MP3 or WAV audio files are supported.')
+              continue
+            }
+          }
+
+          if (!isAudioFile(finalFile)) {
+            alert('Only MP3 or WAV audio files are supported.')
+            continue
+          }
+
+          processedFiles.push(finalFile)
+          continue
+        }
+
+        processedFiles.push(file)
+      }
+
+      if (processedFiles.length === 0) return
+
+      setSelectedFiles(prev => {
+        const combined = [...prev, ...processedFiles]
+        if (combined.length > 5) {
+          alert('You can only upload up to 5 files')
+        }
+        return combined.slice(0, 5)
+      })
+    }
+
+    processFiles()
+  }, [isAudioFile])
 
   // Remove selected file
   const removeFile = useCallback((index) => {
@@ -177,7 +359,12 @@ export default function AiChat({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       audioStreamRef.current = stream
 
-      const mediaRecorder = new MediaRecorder(stream)
+      const options = { mimeType: 'audio/webm' }
+      if (!MediaRecorder.isTypeSupported || !MediaRecorder.isTypeSupported(options.mimeType)) {
+        options.mimeType = 'audio/mp4'
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, options)
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
 
@@ -188,22 +375,38 @@ export default function AiChat({
       }
 
       mediaRecorder.onstop = () => {
-        const mimeType = mediaRecorder.mimeType || 'audio/webm'
+        const mimeType = sanitizeMimeType(mediaRecorder.mimeType || audioChunksRef.current[0]?.type) || 'audio/webm'
         if (audioChunksRef.current.length > 0) {
           const blob = new Blob(audioChunksRef.current, { type: mimeType })
-          const randomSuffix = Math.random().toString(36).slice(2, 6)
-          const fileExtension = mimeType.includes('mp4') ? 'm4a' : mimeType.split('/')[1] || 'webm'
-          const audioFile = new File([blob], `voice-query-${randomSuffix}.${fileExtension}`, {
-            type: mimeType,
-          })
 
-          setSelectedFiles(prev => {
-            if (prev.length >= 5) {
-              alert('You can only upload up to 5 files')
-              return prev
+          const processRecording = async () => {
+            try {
+              const { blob: normalizedBlob, mimeType: normalizedMime, extension } = await normalizeAudioBlobToSupportedFormat(blob)
+              const randomSuffix = Math.random().toString(36).slice(2, 6)
+              const audioFile = new File([normalizedBlob], `voice-query-${randomSuffix}.${extension}`, {
+                type: normalizedMime,
+              })
+
+              setSelectedFiles(prev => {
+                if (prev.length >= 5) {
+                  alert('You can only upload up to 5 files')
+                  return prev
+                }
+                return [...prev, audioFile].slice(0, 5)
+              })
+            } catch (error) {
+              console.error('Failed to normalize recording:', error)
+              alert('Recording failed to process. Please try again.')
             }
-            return [...prev, audioFile].slice(0, 5)
-          })
+          }
+
+          processRecording()
+
+          audioChunksRef.current = []
+          cleanupAudioStream()
+          mediaRecorderRef.current = null
+          setIsRecording(false)
+          return
         }
 
         audioChunksRef.current = []
