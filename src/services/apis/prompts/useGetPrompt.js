@@ -1,17 +1,17 @@
 import { useState, useCallback } from 'react';
-import { toast } from 'sonner';
 
 // Use proxy in development, full URL in production
 const API_BASE_URL = import.meta.env.DEV ? '/api/v1' : (import.meta.env.VITE_BASE_URL || '');
 
-export const useCreateSession = () => {
+export const useGetPrompt = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [prompt, setPrompt] = useState(null);
 
   // Helper function for API calls
   const apiRequest = useCallback(async (url, options = {}) => {
     const response = await fetch(`${API_BASE_URL}${url}`, {
-      headers: {
+      headers: { 
         'Content-Type': 'application/json',
         ...options.headers,
       },
@@ -28,26 +28,36 @@ export const useCreateSession = () => {
     return data;
   }, []);
 
-  // Create a new session
-  const createSession = useCallback(async (sessionData) => {
+  // Get a single prompt by ID
+  const getPrompt = useCallback(async (promptId) => {
+    if (!promptId) {
+      return {
+        success: false,
+        error: 'Prompt ID is required',
+      };
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await apiRequest('/sessions', {
-        method: 'POST',
-        body: JSON.stringify(sessionData),
+      const data = await apiRequest(`/prompts/${promptId}`, {
+        method: 'GET',
+        credentials: 'include',
       });
+
+      // Update local state
+      const promptData = data.data?.prompt || data.prompt || null;
+      setPrompt(promptData);
 
       return {
         success: true,
-        data: data.data || data,
-        message: data.message || 'Session created successfully'
+        prompt: promptData,
+        message: data.message || 'Prompt retrieved successfully'
       };
     } catch (err) {
-      const errorMessage = err.message || 'Failed to create session';
+      const errorMessage = err.message || 'Failed to fetch prompt';
       setError(errorMessage);
-      toast.error(errorMessage);
 
       return {
         success: false,
@@ -62,15 +72,22 @@ export const useCreateSession = () => {
     setError(null);
   }, []);
 
+  const clearPrompt = useCallback(() => {
+    setPrompt(null);
+  }, []);
+
   return {
     // State
     isLoading,
     error,
+    prompt,
 
     // Actions
-    createSession,
+    getPrompt,
 
     // Utilities
     clearError,
+    clearPrompt,
   };
 };
+

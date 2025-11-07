@@ -1,10 +1,9 @@
 import { useState, useCallback } from 'react';
-import { toast } from 'sonner';
 
 // Use proxy in development, full URL in production
 const API_BASE_URL = import.meta.env.DEV ? '/api/v1' : (import.meta.env.VITE_BASE_URL || '');
 
-export const useCreateSession = () => {
+export const useDeletePrompt = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -28,26 +27,30 @@ export const useCreateSession = () => {
     return data;
   }, []);
 
-  // Create a new session
-  const createSession = useCallback(async (sessionData) => {
+  // Delete a prompt
+  const deletePrompt = useCallback(async (promptId) => {
+    if (!promptId) {
+      return {
+        success: false,
+        error: 'Prompt ID is required',
+      };
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await apiRequest('/sessions', {
-        method: 'POST',
-        body: JSON.stringify(sessionData),
+      const data = await apiRequest(`/prompts/${promptId}`, {
+        method: 'DELETE',
       });
 
       return {
         success: true,
-        data: data.data || data,
-        message: data.message || 'Session created successfully'
+        message: data.message || 'Prompt deleted successfully'
       };
     } catch (err) {
-      const errorMessage = err.message || 'Failed to create session';
+      const errorMessage = err.message || 'Failed to delete prompt';
       setError(errorMessage);
-      toast.error(errorMessage);
 
       return {
         success: false,
@@ -68,9 +71,10 @@ export const useCreateSession = () => {
     error,
 
     // Actions
-    createSession,
+    deletePrompt,
 
     // Utilities
     clearError,
   };
 };
+

@@ -35,6 +35,18 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+// Grade and subject enums matching the API
+const grades = ['Kindergarten', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+const subjects = ['math', 'science', 'english', 'history', 'geography', 'art', 'music', 'physical-education', 'computer-science', 'other'];
+
+const formatSubject = (subject) => {
+  if (!subject) return '';
+  return subject
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
 // Helper function to format date
 const formatDate = (dateString) => {
   const date = new Date(dateString);
@@ -51,15 +63,16 @@ const formatDate = (dateString) => {
 // Helper function to get subject icon
 const getSubjectIcon = (subject) => {
   const subjectIcons = {
-    'Mathematics': '🔢',
-    'Science': '🧪',
-    'Art': '🎨',
-    'History': '📚',
-    'Geography': '🌍',
-    'English': '📝',
-    'Physics': '⚛️',
-    'Chemistry': '🧬',
-    'Biology': '🦠'
+    'math': '🔢',
+    'science': '🧪',
+    'art': '🎨',
+    'history': '📚',
+    'geography': '🌍',
+    'english': '📝',
+    'music': '🎵',
+    'physical-education': '⚽',
+    'computer-science': '💻',
+    'other': '📖'
   };
   return subjectIcons[subject] || '📖';
 };
@@ -186,15 +199,11 @@ export default function DashboardPage() {
                     onChange={(e) => handleInputChange('subject', e.target.value)}
                   >
                     <option value="">Select a subject</option>
-                    <option value="Mathematics">Mathematics</option>
-                    <option value="Science">Science</option>
-                    <option value="English">English</option>
-                    <option value="History">History</option>
-                    <option value="Geography">Geography</option>
-                    <option value="Art">Art</option>
-                    <option value="Physics">Physics</option>
-                    <option value="Chemistry">Chemistry</option>
-                    <option value="Biology">Biology</option>
+                    {subjects.map((subject) => (
+                      <option key={subject} value={subject}>
+                        {formatSubject(subject)}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 
@@ -207,19 +216,11 @@ export default function DashboardPage() {
                     onChange={(e) => handleInputChange('gradeLevel', e.target.value)}
                   >
                     <option value="">Select grade level</option>
-                    <option value="Kindergarten">Kindergarten</option>
-                    <option value="Grade 1">Grade 1</option>
-                    <option value="Grade 2">Grade 2</option>
-                    <option value="Grade 3">Grade 3</option>
-                    <option value="Grade 4">Grade 4</option>
-                    <option value="Grade 5">Grade 5</option>
-                    <option value="Grade 6">Grade 6</option>
-                    <option value="Grade 7">Grade 7</option>
-                    <option value="Grade 8">Grade 8</option>
-                    <option value="Grade 9">Grade 9</option>
-                    <option value="Grade 10">Grade 10</option>
-                    <option value="Grade 11">Grade 11</option>
-                    <option value="Grade 12">Grade 12</option>
+                    {grades.map((grade) => (
+                      <option key={grade} value={grade}>
+                        {grade === 'Kindergarten' ? 'Kindergarten' : `Grade ${grade}`}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -274,7 +275,7 @@ export default function DashboardPage() {
                           {formatDate(session.lastAccessedAt)}
                         </span>
                         <span className="text-xs text-blue-600 font-medium">
-                          {session.subject}
+                          {formatSubject(session.subject)}
                         </span>
                       </div>
 

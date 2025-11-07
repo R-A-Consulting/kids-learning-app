@@ -14,6 +14,7 @@ const Toaster = ({
           color: '#374151',
         },
       }}
+      position="top-right"
       {...props} />
   );
 }

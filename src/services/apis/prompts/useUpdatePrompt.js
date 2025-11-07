@@ -1,10 +1,9 @@
 import { useState, useCallback } from 'react';
-import { toast } from 'sonner';
 
 // Use proxy in development, full URL in production
 const API_BASE_URL = import.meta.env.DEV ? '/api/v1' : (import.meta.env.VITE_BASE_URL || '');
 
-export const useCreateSession = () => {
+export const useUpdatePrompt = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -28,26 +27,34 @@ export const useCreateSession = () => {
     return data;
   }, []);
 
-  // Create a new session
-  const createSession = useCallback(async (sessionData) => {
+  // Update a prompt
+  const updatePrompt = useCallback(async (promptId, updateData) => {
+    if (!promptId) {
+      return {
+        success: false,
+        error: 'Prompt ID is required',
+      };
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await apiRequest('/sessions', {
-        method: 'POST',
-        body: JSON.stringify(sessionData),
+      const data = await apiRequest(`/prompts/${promptId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
       });
+
+      const promptData = data.data?.prompt || data.prompt || null;
 
       return {
         success: true,
-        data: data.data || data,
-        message: data.message || 'Session created successfully'
+        prompt: promptData,
+        message: data.message || 'Prompt updated successfully'
       };
     } catch (err) {
-      const errorMessage = err.message || 'Failed to create session';
+      const errorMessage = err.message || 'Failed to update prompt';
       setError(errorMessage);
-      toast.error(errorMessage);
 
       return {
         success: false,
@@ -68,9 +75,10 @@ export const useCreateSession = () => {
     error,
 
     // Actions
-    createSession,
+    updatePrompt,
 
     // Utilities
     clearError,
   };
 };
+

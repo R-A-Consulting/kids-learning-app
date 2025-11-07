@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { GraduationCap, Home, LogOut, MessageSquare, Users as UsersIcon } from 'lucide-react';
+import { GraduationCap, Home, LogOut, MessageSquare, Users as UsersIcon, Sparkles } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -17,13 +17,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { GlobalContext } from '@/services/contexts/global-context';
 
-// Menu items for the sidebar (currently empty for dashboard)
+// Menu items for the sidebar
 const menuItems = [
   {
     title: 'Home',
     icon: Home,
     url: '/dashboard',
-  }
+  },
 ];
 
 export function AppSidebar({ user }) {
@@ -99,6 +99,14 @@ export function AppSidebar({ user }) {
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={isActivePath('/dashboard/prompts')}>
+                    <Link to="/dashboard/prompts">
+                      <Sparkles className="h-4 w-4" />
+                      <span>Prompts</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={isActivePath('/dashboard/users')}>
                     <Link to="/dashboard/users">

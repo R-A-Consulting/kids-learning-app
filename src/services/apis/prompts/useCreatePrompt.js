@@ -1,10 +1,9 @@
 import { useState, useCallback } from 'react';
-import { toast } from 'sonner';
 
 // Use proxy in development, full URL in production
 const API_BASE_URL = import.meta.env.DEV ? '/api/v1' : (import.meta.env.VITE_BASE_URL || '');
 
-export const useCreateSession = () => {
+export const useCreatePrompt = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -28,26 +27,25 @@ export const useCreateSession = () => {
     return data;
   }, []);
 
-  // Create a new session
-  const createSession = useCallback(async (sessionData) => {
+  // Create a new prompt
+  const createPrompt = useCallback(async (promptData) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await apiRequest('/sessions', {
+      const data = await apiRequest('/prompts', {
         method: 'POST',
-        body: JSON.stringify(sessionData),
+        body: JSON.stringify(promptData),
       });
 
       return {
         success: true,
         data: data.data || data,
-        message: data.message || 'Session created successfully'
+        message: data.message || 'Prompt created successfully'
       };
     } catch (err) {
-      const errorMessage = err.message || 'Failed to create session';
+      const errorMessage = err.message || 'Failed to create prompt';
       setError(errorMessage);
-      toast.error(errorMessage);
 
       return {
         success: false,
@@ -68,9 +66,10 @@ export const useCreateSession = () => {
     error,
 
     // Actions
-    createSession,
+    createPrompt,
 
     // Utilities
     clearError,
   };
 };
+
