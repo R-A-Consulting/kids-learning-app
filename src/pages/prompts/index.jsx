@@ -22,9 +22,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { useGetPrompts, useCreatePrompt, useUpdatePrompt, useDeletePrompt } from '@/services/apis/prompts';
 import { toast } from 'sonner';
+import MDEditor from '@uiw/react-md-editor';
+import '@uiw/react-md-editor/markdown-editor.css';
+import ReactMarkdown from 'react-markdown';
 
 const grades = ['Kindergarten', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 const subjects = ['math', 'science', 'english', 'history', 'geography', 'art', 'music', 'physical-education', 'computer-science', 'other'];
@@ -190,7 +192,8 @@ export default function PromptsPage() {
   };
 
   const handleCopyPrompt = (content) => {
-    navigator.clipboard.writeText(content);
+    // Copy markdown content as-is
+    navigator.clipboard.writeText(content || '');
     toast.success('Prompt copied to clipboard');
   };
 
@@ -234,7 +237,7 @@ export default function PromptsPage() {
             </Button>
           </DialogTrigger>
 
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{selectedPrompt ? 'Edit Prompt' : 'Create Prompt'}</DialogTitle>
               <DialogDescription>
@@ -291,14 +294,28 @@ export default function PromptsPage() {
 
               <div className="grid gap-2">
                 <Label htmlFor="prompt">Prompt Content *</Label>
-                <Textarea
-                  id="prompt"
-                  placeholder="Enter the prompt content..."
-                  value={formData.prompt}
-                  onChange={(e) => handleInputChange('prompt', e.target.value)}
-                  rows={6}
-                  className="resize-none"
-                />
+                <div className="border rounded-md overflow-hidden">
+                  <MDEditor
+                    value={formData.prompt || ''}
+                    onChange={(value) => handleInputChange('prompt', value || '')}
+                    data-color-mode="light"
+                    preview="edit"
+                    hideToolbar={false}
+                    visibleDragBar={true}
+                    textareaProps={{
+                      placeholder: 'Enter the prompt content using markdown...',
+                      style: {
+                        minHeight: '200px',
+                        fontSize: '14px',
+                        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace'
+                      }
+                    }}
+                    height={300}
+                  />
+                </div>
+                <p className="text-xs text-gray-500">
+                  Use markdown formatting: **bold**, *italic*, # headers, lists, links, and `code`.
+                </p>
               </div>
 
               <div className="grid gap-2">
@@ -430,7 +447,9 @@ export default function PromptsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    <p className="text-sm text-gray-600 line-clamp-3">{prompt.prompt}</p>
+                    <div className="text-sm text-gray-600 line-clamp-3 prose prose-sm max-w-none">
+                      <ReactMarkdown>{prompt.prompt || ''}</ReactMarkdown>
+                    </div>
                     <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t">
                       <span>
                         {prompt.updatedAt ? `Updated ${formatDate(prompt.updatedAt)}` : 

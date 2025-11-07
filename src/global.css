@@ -154,3 +154,87 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Markdown Editor Styles */
+.wmde-markdown {
+  background-color: transparent !important;
+}
+
+.wmde-markdown-editor {
+  border-color: var(--border) !important;
+}
+
+.wmde-markdown-editor .w-md-editor-text-pre {
+  color: var(--foreground) !important;
+}
+
+.wmde-markdown-editor .w-md-editor-text-textarea {
+  color: var(--foreground) !important;
+  background-color: var(--background) !important;
+}
+
+.wmde-markdown-editor .w-md-editor-bar {
+  background-color: var(--muted) !important;
+  border-color: var(--border) !important;
+}
+
+.wmde-markdown-editor .w-md-editor-bar svg {
+  color: var(--foreground) !important;
+}
+
+.wmde-markdown-editor .w-md-editor-bar button:hover {
+  background-color: var(--accent) !important;
+}
+
+.wmde-markdown-editor .w-md-editor-bar button.active {
+  background-color: var(--accent) !important;
+}
+
+/* Prose styles for rendered markdown */
+.prose {
+  color: var(--foreground);
+}
+
+.prose p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose ul, .prose ol {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding-left: 1.5em;
+}
+
+.prose h1, .prose h2, .prose h3 {
+  font-weight: 600;
+  margin-top: 0.75em;
+  margin-bottom: 0.5em;
+}
+
+.prose a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.prose code {
+  background-color: var(--muted);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.prose pre {
+  background-color: var(--muted);
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+.prose blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 1rem;
+  margin-left: 0;
+  font-style: italic;
+  color: var(--muted-foreground);
+}
