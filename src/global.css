@@ -238,3 +238,50 @@ body {
   font-style: italic;
   color: var(--muted-foreground);
 }
+
+/* Enhanced Math Equation Styling */
+.katex {
+  font-size: 1.1em !important;
+}
+
+.katex-display {
+  margin: 1em 0 !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.katex-display > .katex {
+  display: inline-block;
+  text-align: initial;
+}
+
+/* Inline math equations */
+.katex-display.leqno {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* Code block improvements */
+pre[class*="language-"] {
+  margin: 0;
+  padding: 0;
+}
+
+/* Syntax highlighter overrides */
+pre code {
+  display: block;
+  overflow-x: auto;
+}
+
+/* Better spacing for markdown content */
+.markdown-content {
+  line-height: 1.6;
+}
+
+.markdown-content > *:first-child {
+  margin-top: 0;
+}
+
+.markdown-content > *:last-child {
+  margin-bottom: 0;
+}
