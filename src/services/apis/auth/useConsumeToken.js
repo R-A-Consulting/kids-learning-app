@@ -14,21 +14,12 @@ export const useConsumeToken = () => {
     setError(null);
 
     try {
-      // Token is sent as query parameter, credentials in body
-      // Using POST since we have a body
-      const bodyData = {
-        email: credentials.email || '',
-        password: credentials.password || '',
-        redirectUrl: credentials.redirectUrl || window.location.origin + '/dashboard',
-      };
-
       const response = await fetch(`${API_BASE_URL}/auth/consume-token?token=${encodeURIComponent(token)}`, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
-        body: JSON.stringify(bodyData),
+        credentials: 'include'
       });
 
       const data = await response.json();
