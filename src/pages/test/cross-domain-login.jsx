@@ -5,13 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCrossDomainLogin } from '@/services/apis/auth';
-import { Code2, Copy, Check } from 'lucide-react';
+import { Code2 } from 'lucide-react';
 
 export default function CrossDomainLoginTestPage() {
   const [email, setEmail] = useState('john@example.com');
   const [password, setPassword] = useState('a1996kasH!');
   const [redirectUrl, setRedirectUrl] = useState('https://app.ismdev.in/auth/consume');
-  const [copied, setCopied] = useState(false);
   const { crossDomainLogin, isLoading, error, response, clearError, clearResponse } = useCrossDomainLogin();
 
   const handleSubmit = async (e) => {
@@ -27,21 +26,33 @@ export default function CrossDomainLoginTestPage() {
       });
 
       if (result.success) {
-        toast.success('API call successful!');
+        // Extract redirect URL from response
+        // Try common response patterns: data.redirectUrl, data.url, redirectUrl, etc.
+        const redirectLink = 
+          result.data?.redirectUrl || 
+          result.data?.url || 
+          result.data?.redirect || 
+          result.data?.link ||
+          result.redirectUrl ||
+          result.url ||
+          result.redirect ||
+          result.link;
+
+        if (redirectLink) {
+          toast.success('Redirecting...');
+          // Small delay to show the toast, then redirect
+          setTimeout(() => {
+            window.location.href = redirectLink;
+          }, 500);
+        } else {
+          toast.error('No redirect URL found in response');
+          console.log('API Response:', result);
+        }
       } else {
         toast.error(result.error || 'API call failed');
       }
     } catch {
       toast.error('An unexpected error occurred');
-    }
-  };
-
-  const copyResponse = () => {
-    if (response) {
-      navigator.clipboard.writeText(JSON.stringify(response, null, 2));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      toast.success('Response copied to clipboard');
     }
   };
 
@@ -125,32 +136,8 @@ export default function CrossDomainLoginTestPage() {
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>API Response</CardTitle>
-                  <CardDescription>Response from the API endpoint</CardDescription>
-                </div>
-                {response && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={copyResponse}
-                    className="h-8"
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="h-4 w-4 mr-2" />
-                        Copied
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
+              <CardTitle>API Response</CardTitle>
+              <CardDescription>Response from the API endpoint (will redirect on success)</CardDescription>
             </CardHeader>
             <CardContent>
               {response ? (
@@ -160,10 +147,12 @@ export default function CrossDomainLoginTestPage() {
                       <code>{JSON.stringify(response, null, 2)}</code>
                     </pre>
                   </div>
-                  {response.data?.token && (
+                  {(response.data?.redirectUrl || response.data?.url || response.redirectUrl || response.url) && (
                     <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                      <p className="text-sm font-medium text-blue-900 mb-1">Token:</p>
-                      <p className="text-xs text-blue-700 break-all">{response.data.token}</p>
+                      <p className="text-sm font-medium text-blue-900 mb-1">Redirect URL:</p>
+                      <p className="text-xs text-blue-700 break-all">
+                        {response.data?.redirectUrl || response.data?.url || response.redirectUrl || response.url}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -172,6 +161,7 @@ export default function CrossDomainLoginTestPage() {
                   <Code2 className="h-12 w-12 mb-2" />
                   <p className="text-sm">No response yet</p>
                   <p className="text-xs mt-1">Submit the form to test the API</p>
+                  <p className="text-xs mt-2 text-gray-500">You will be redirected automatically on success</p>
                 </div>
               )}
             </CardContent>
