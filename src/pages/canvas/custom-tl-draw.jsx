@@ -488,7 +488,7 @@ const CustomCanvasToolbar = ({ editor }) => {
   )
 }
 
-export default function CustomTldraw({ sessionId, onCanvasImageUpdate }) {
+export default function CustomTldraw({ sessionId, onCanvasImageUpdate, onCanvasStateChange }) {
   const editorRef = useRef(null)
   const isDrawingRef = useRef(false)
   const exportTimeoutRef = useRef(null)
@@ -534,7 +534,18 @@ export default function CustomTldraw({ sessionId, onCanvasImageUpdate }) {
 
   // Load existing canvas data when component mounts
   const loadCanvasData = async () => {
-    if (!sessionId || hasLoadedDataRef.current) return
+    if (hasLoadedDataRef.current) {
+      setIsInitializing(false)
+      onCanvasStateChange?.({ state: 'idle', source: 'canvas', message: 'Canvas ready' })
+      return
+    }
+    onCanvasStateChange?.({ state: 'canvas-loading', source: 'canvas', message: 'Loading canvas…' })
+    if (!sessionId || sessionId === 'new') {
+      hasLoadedDataRef.current = true
+      setIsInitializing(false)
+      onCanvasStateChange?.({ state: 'idle', source: 'canvas', message: 'Canvas ready' })
+      return
+    }
     
     try {
       const result = await getSession(sessionId)
@@ -546,9 +557,11 @@ export default function CustomTldraw({ sessionId, onCanvasImageUpdate }) {
       }
     } catch (error) {
       console.error('[tldraw] Failed to load canvas data:', error)
+      onCanvasStateChange?.({ state: 'error', source: 'canvas', message: 'Could not load the canvas' })
     } finally {
       hasLoadedDataRef.current = true
       setIsInitializing(false)
+      onCanvasStateChange?.({ state: 'idle', source: 'canvas', message: 'Canvas ready' })
     }
   }
 
@@ -713,6 +726,7 @@ export default function CustomTldraw({ sessionId, onCanvasImageUpdate }) {
   const handleEditorMount = (editor) => {
     editorRef.current = editor
 
+    onCanvasStateChange?.({ state: 'canvas-loading', source: 'canvas', message: 'Preparing canvas…' })
     setTimeout(async () => {
       await loadCanvasData()
       exportCanvasToPng()

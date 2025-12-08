@@ -3,6 +3,7 @@ import LoginPage from './pages/login';
 import DashboardPage from './pages/dashboard';
 import UsersPage from './pages/users';
 import PromptsPage from './pages/prompts';
+import AuthConsumePage from './pages/auth/consume';
 
 const routes = [
   {
@@ -28,6 +29,10 @@ const routes = [
   {
     path: '/dashboard/prompts',
     element: <PromptsPage />,
+  },
+  {
+    path: '/auth/consume',
+    element: <AuthConsumePage />,
   },
 ];
 

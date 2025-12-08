@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import AiChat from './ai-chat'
 import { GripVertical } from 'lucide-react'
+import AnimatedCharacter from '@/components/animated-character'
 
 // Constants
 const PANEL_WIDTH = 350
@@ -12,7 +13,7 @@ const MINIMIZED_HEIGHT = 36
 const DOCK_THRESHOLD = 20
 
 export default function AIChatPanel(props) {
-  const { onDockChange, sessionId, canvasImage } = props || {}
+  const { onDockChange, sessionId, canvasImage, onAiStateChange, characterMood } = props || {}
   
   // State management
   const [isMinimized, setIsMinimized] = useState(false)
@@ -175,7 +176,7 @@ export default function AIChatPanel(props) {
     <div
       ref={panelRef}
       className={cn(
-        "fixed top-0 left-0 bg-white border-gray-100 flex flex-col overflow-hidden",
+        "fixed top-0 left-0 bg-white border-gray-100 flex flex-col overflow-visible", // Changed overflow-hidden to overflow-visible
         !isDragging && !isResizing && "transition-transform duration-300 ease-out",
         isDragging && "cursor-move shadow-md",
         isMinimized && "cursor-pointer",
@@ -225,7 +226,17 @@ export default function AIChatPanel(props) {
         dockedPosition={dockedPosition}
         sessionId={sessionId}
         canvasImage={canvasImage}
+        onAiStateChange={onAiStateChange}
+        characterMood={characterMood}
       />
+      
+      {/* Animated Character - Positioned at bottom right, peeking out */}
+      {!isMinimized && (
+        <AnimatedCharacter 
+            mood={characterMood} 
+            className="absolute -right-40 bottom-10 z-50 scale-[0.85] origin-bottom-left"
+        />
+      )}
     </div>
   )
 }

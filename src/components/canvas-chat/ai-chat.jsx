@@ -257,6 +257,8 @@ export default function AiChat({
   sessionId,
   dockedPosition,
   canvasImage,
+  onAiStateChange,
+  characterMood,
 }) {
   const navigate = useNavigate()
   const scrollRef = useRef(null)
@@ -266,6 +268,8 @@ export default function AiChat({
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const audioStreamRef = useRef(null)
+  const celebrationTimeoutRef = useRef(null)
+  const celebrateLockRef = useRef(false)
   
   const { user } = GlobalContext()
   const { createStreamingMessage, isStreaming: apiStreaming } = useCreateStreamingMessage()
@@ -284,6 +288,26 @@ export default function AiChat({
   const isStreaming = Boolean(streamingMessageIdRef.current) || apiStreaming
   const audioRefs = useRef({})
   const audioPreviewsRef = useRef(audioPreviews)
+
+  const emitAiState = useCallback((state, message) => {
+    if (!onAiStateChange) return
+
+    if (state === 'celebrate') {
+      celebrateLockRef.current = true
+      onAiStateChange({ state, source: 'chat', message })
+      if (celebrationTimeoutRef.current) {
+        clearTimeout(celebrationTimeoutRef.current)
+      }
+      celebrationTimeoutRef.current = setTimeout(() => {
+        celebrateLockRef.current = false
+        onAiStateChange({ state: 'idle', source: 'chat' })
+      }, 1200)
+      return
+    }
+
+    if (celebrateLockRef.current && state !== 'error') return
+    onAiStateChange({ state, source: 'chat', message })
+  }, [onAiStateChange])
 
   const isAudioFile = useCallback((file) => {
     if (!file) return false
@@ -328,6 +352,26 @@ export default function AiChat({
       getSessionMessages(sessionId)
     }
   }, [sessionId, getSessionMessages])
+
+  useEffect(() => {
+    if (!onAiStateChange) return undefined
+
+    if (messagesLoading) {
+      emitAiState('loading', 'Loading conversation…')
+    } else if (isRecording) {
+      emitAiState('listening', 'Listening to you…')
+    } else if (isStreaming) {
+      emitAiState('thinking', 'AI is thinking…')
+    } else {
+      emitAiState('idle', 'Ready when you are!')
+    }
+
+    return () => {
+      if (celebrationTimeoutRef.current) {
+        clearTimeout(celebrationTimeoutRef.current)
+      }
+    }
+  }, [messagesLoading, isStreaming, isRecording, emitAiState, onAiStateChange])
   
   // Update messages when API messages change
   useEffect(() => {
@@ -510,6 +554,7 @@ export default function AiChat({
 
       mediaRecorder.start()
       setIsRecording(true)
+      emitAiState('listening', 'Listening to you…')
     } catch (error) {
       console.error('Error accessing microphone:', error)
       alert('Unable to start recording. Please check microphone permissions.')
@@ -518,7 +563,7 @@ export default function AiChat({
       audioChunksRef.current = []
       setIsRecording(false)
     }
-  }, [cleanupAudioStream, isStreaming, selectedFiles.length, shouldAutoSendAfterRecording])
+  }, [cleanupAudioStream, emitAiState, isStreaming, selectedFiles.length, shouldAutoSendAfterRecording])
 
   const stopRecording = useCallback((shouldSave = true) => {
     const recorder = mediaRecorderRef.current
@@ -612,6 +657,7 @@ export default function AiChat({
       ...prev,
       [assistantId]: LOADING_PHRASES[Math.floor(Math.random() * LOADING_PHRASES.length)],
     }))
+    emitAiState('thinking', 'AI is thinking…')
 
     // Start streaming
     try {
@@ -641,6 +687,7 @@ export default function AiChat({
         if (chunkData.eventType === 'complete') {
           streamingMessageIdRef.current = null
           setCurrentStreamId(null)
+          emitAiState('celebrate', 'Answer ready!')
         }
       })
 
@@ -649,6 +696,7 @@ export default function AiChat({
         setMessages(prev => prev.map(m =>
           m.id === assistantId ? { ...m, text: errorText, isStreaming: false } : m
         ))
+        emitAiState('error', 'I hit a snag. Please try again.')
       }
     } catch (error) {
       console.error('Streaming error:', error)
@@ -656,11 +704,12 @@ export default function AiChat({
       setMessages(prev => prev.map(m =>
         m.id === assistantId ? { ...m, text: errorText, isStreaming: false } : m
       ))
+      emitAiState('error', 'I hit a snag. Please try again.')
     } finally {
       streamingMessageIdRef.current = null
       setCurrentStreamId(null)
     }
-  }, [draft, hasAudioAttachment, sessionId, user?._id, user?.id, selectedFiles, createStreamingMessage])
+  }, [createStreamingMessage, draft, emitAiState, hasAudioAttachment, selectedFiles, sessionId, user?._id, user?.id])
 
   // Focus input when expanded
   useEffect(() => {
@@ -1017,18 +1066,19 @@ export default function AiChat({
           )}
 
           {/* Input area */}
-          <form 
-            onSubmit={(e) => {
-              e.preventDefault()
-              handleSend(e, true)
-              setSelectedFiles(canvasImage ? [canvasImage] : [])
-              setDraft('')
-            }}
-            className={cn(
-              "mx-2 rounded-full border border-gray-100 bg-slate-50 mb-2",
-              isRecording && "border-red-400 bg-red-50"
-            )}
-          >
+          <div className="relative mt-auto">
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleSend(e, true)
+                setSelectedFiles(canvasImage ? [canvasImage] : [])
+                setDraft('')
+              }}
+              className={cn(
+                "relative z-10 mx-2 rounded-full border border-gray-100 bg-slate-50/95 backdrop-blur-sm mb-2 shadow-sm transition-all duration-300",
+                isRecording && "border-red-400 bg-red-50"
+              )}
+            >
             
             <div className="p-1">
               <div className="flex gap-0 items-center">
@@ -1139,6 +1189,7 @@ export default function AiChat({
               </div>
             </div>
           </form>
+          </div>
         </>
       )}
     </>
