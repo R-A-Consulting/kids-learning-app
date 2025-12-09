@@ -4,7 +4,6 @@ import DashboardPage from './pages/dashboard';
 import UsersPage from './pages/users';
 import PromptsPage from './pages/prompts';
 import AuthConsumePage from './pages/auth/consume';
-import CrossDomainLoginTestPage from './pages/test/cross-domain-login';
 
 const routes = [
   {
@@ -34,10 +33,6 @@ const routes = [
   {
     path: '/auth/consume',
     element: <AuthConsumePage />,
-  },
-  {
-    path: '/test/cross-domain-login',
-    element: <CrossDomainLoginTestPage />,
   },
 ];
 

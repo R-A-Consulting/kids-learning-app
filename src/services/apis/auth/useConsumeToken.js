@@ -9,7 +9,7 @@ export const useConsumeToken = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const consumeToken = useCallback(async (token, credentials = {}) => {
+  const consumeToken = useCallback(async (token) => {
     setIsLoading(true);
     setError(null);
 
