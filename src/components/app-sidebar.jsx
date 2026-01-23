@@ -1,6 +1,12 @@
 import * as React from "react"
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { GraduationCap, Home, LogOut, MessageSquare, Users as UsersIcon, Sparkles } from 'lucide-react';
+import { 
+  GraduationCap, 
+  Home, 
+  LogOut, 
+  Users as UsersIcon, 
+  Sparkles, 
+} from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -17,12 +23,17 @@ import {
 import { Button } from '@/components/ui/button';
 import { GlobalContext } from '@/services/contexts/global-context';
 
-// Menu items for the sidebar
+// Main menu items
 const menuItems = [
   {
     title: 'Home',
     icon: Home,
     url: '/dashboard',
+  },
+  {
+    title: 'AI Questions',
+    icon: Sparkles,
+    url: '/dashboard/ai-questions',
   },
 ];
 
@@ -60,7 +71,7 @@ export function AppSidebar({ user }) {
   }, [navigate, setUser, location.pathname]);
 
   const isActivePath = React.useCallback(
-    (path) => location.pathname === path,
+    (path) => location.pathname === path || location.pathname.startsWith(path + '/'),
     [location.pathname]
   );
 

@@ -28,7 +28,8 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api/v1': {
-        target: 'https://node.ismdev.in/',
+        // target: 'https://node.ismdev.in/',
+        target: 'http://localhost:3000/',
         changeOrigin: true,
         rewrite: (path) => path,
         configure: (proxy, _options) => {

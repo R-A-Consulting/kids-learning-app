@@ -3,6 +3,8 @@ import LoginPage from './pages/login';
 import DashboardPage from './pages/dashboard';
 import UsersPage from './pages/users';
 import PromptsPage from './pages/prompts';
+import AIQuestionsPage from './pages/ai-questions/index';
+import AIQuestionDetailPage from './pages/ai-questions/detail';
 
 const routes = [
   {
@@ -28,6 +30,14 @@ const routes = [
   {
     path: '/dashboard/prompts',
     element: <PromptsPage />,
+  },
+  {
+    path: '/dashboard/ai-questions',
+    element: <AIQuestionsPage />,
+  },
+  {
+    path: '/dashboard/ai-questions/:id',
+    element: <AIQuestionDetailPage />,
   },
 ];
 
