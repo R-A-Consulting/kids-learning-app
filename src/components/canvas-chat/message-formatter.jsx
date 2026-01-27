@@ -9,6 +9,17 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { Copy, Check } from 'lucide-react'
 
+// Convert LaTeX delimiters to standard format for remark-math
+// Handles \( \) for inline math and \[ \] for display math
+function preprocessMath(text) {
+  if (!text || typeof text !== 'string') return text || '';
+  return text
+    .replace(/\\\(/g, '$')      // \( -> $
+    .replace(/\\\)/g, '$')      // \) -> $
+    .replace(/\\\[/g, '$$')     // \[ -> $$
+    .replace(/\\\]/g, '$$');    // \] -> $$
+}
+
 // Custom code block component with syntax highlighting and copy button
 const CodeBlock = ({ language, children, className }) => {
   const [copied, setCopied] = useState(false)
@@ -80,17 +91,29 @@ const CodeBlock = ({ language, children, className }) => {
   )
 }
 
-export default function MessageFormatter({ children, className }) {
+export default function MessageFormatter({ children, className, inline = false }) {
+  // Preprocess to convert \( \) and \[ \] delimiters to $ and $$
+  const processedContent = preprocessMath(children);
+  
+  // For inline rendering, use span instead of div
+  const Wrapper = inline ? 'span' : 'div';
+  
+  // Store inline flag for use in components
+  const isInline = inline;
+  
   return (
-    <div className={className}>
+    <Wrapper className={className}>
       <ReactMarkdown
         remarkPlugins={[remarkMath, remarkGfm]}
         rehypePlugins={[rehypeKatex]}
         components={{
           // Paragraphs with proper spacing
-          p: ({ children }) => (
-            <span className="whitespace-pre-wrap block my-1.5 leading-relaxed">{children}</span>
-          ),
+          p: ({ children }) => {
+            if (isInline) {
+              return <span className="whitespace-pre-wrap inline leading-relaxed">{children}</span>;
+            }
+            return <span className="whitespace-pre-wrap block my-1.5 leading-relaxed">{children}</span>;
+          },
           
           // Headings with better hierarchy
           h1: ({ children }) => (
@@ -330,8 +353,8 @@ export default function MessageFormatter({ children, className }) {
           },
         }}
       >
-        {children}
+        {processedContent}
       </ReactMarkdown>
-    </div>
+    </Wrapper>
   )
 }

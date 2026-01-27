@@ -6,6 +6,8 @@ import {
   LogOut, 
   Users as UsersIcon, 
   Sparkles, 
+  FileText,
+  BarChart3,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -23,17 +25,24 @@ import {
 import { Button } from '@/components/ui/button';
 import { GlobalContext } from '@/services/contexts/global-context';
 
-// Main menu items
 const menuItems = [
   {
     title: 'Home',
     icon: Home,
     url: '/dashboard',
   },
+];
+
+const questionBankItems = [
   {
-    title: 'AI Questions',
-    icon: Sparkles,
-    url: '/dashboard/ai-questions',
+    title: 'Dashboard',
+    icon: BarChart3,
+    url: '/dashboard/question-bank/dashboard',
+  },
+  {
+    title: 'Question Banks',
+    icon: FileText,
+    url: '/dashboard/question-bank',
   },
 ];
 
@@ -92,6 +101,24 @@ export function AppSidebar({ user }) {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={isActivePath(item.url)}>
+                    <Link to={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Question Bank</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {questionBankItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActivePath(item.url)}>
                     <Link to={item.url}>

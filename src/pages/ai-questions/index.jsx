@@ -146,16 +146,39 @@ export default function AIQuestionsPage() {
 
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragEnter = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragging(true);
   }, []);
 
   const handleDragLeave = useCallback((e) => {
     e.preventDefault();
-    setIsDragging(false);
+    e.stopPropagation();
+    // Only set dragging to false if we're leaving the drop zone itself
+    // (not just moving to a child element)
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    // Check if we're actually leaving the drop zone
+    if (
+      x < rect.left ||
+      x > rect.right ||
+      y < rect.top ||
+      y > rect.bottom
+    ) {
+      setIsDragging(false);
+    }
   }, []);
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
     const files = e.dataTransfer.files;
     if (files.length > 0 && files[0].type === 'application/pdf') {
@@ -316,6 +339,7 @@ export default function AIQuestionsPage() {
                           ? "border-violet-400 bg-violet-50" 
                           : "border-neutral-200 hover:border-neutral-300 bg-white"
                       )}
+                      onDragEnter={handleDragEnter}
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
                       onDrop={handleDrop}

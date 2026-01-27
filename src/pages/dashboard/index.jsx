@@ -142,9 +142,9 @@ export default function DashboardPage() {
           <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
             <DialogTrigger asChild>
               <Card className="bg-gray-50 border-[2px] border-dashed border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer group min-h-[140px] shadow-none">
-                <CardContent className="p-4 flex flex-col justify-start items-start h-full">
+                <CardContent className="p-3 flex flex-col justify-start items-start h-full">
                   {/* Thumbnail */}
-                  <div className="flex items-center justify-center w-12 h-12 bg-blue-100 group-hover:bg-blue-200 rounded-lg mb-3 transition-colors">
+                  <div className="flex items-center justify-center w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-md mb-2 transition-colors">
                     <Plus className="h-5 w-5 text-blue-600" />
                   </div>
 
@@ -246,22 +246,22 @@ export default function DashboardPage() {
           {/* Existing Sessions */}
           {sessions.map((session) => (
             <Link key={session._id} to={`/canvas/${session._id}`}>
-              <Card className="bg-white border border-gray-100 hover:border-blue-300 transition-all duration-200 cursor-pointer group h-[250px] shadow-soft hover:shadow-soft-md p-1">
+              <Card className="bg-white border border-gray-100 hover:border-blue-300 transition-all duration-200 cursor-pointer group h-[200px] shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-1">
                 <CardContent className="p-0 flex flex-col justify-start items-start h-full">
                   {/* Thumbnail */}
-                  <div className="flex items-center justify-center w-full aspect-[4/3] bg-blue-50 group-hover:bg-blue-100 rounded-lg mb-3 transition-colors overflow-hidden">
+                  <div className="flex items-center justify-center w-full aspect-[4/3] bg-blue-50 group-hover:bg-blue-100 rounded-md mb-2 transition-colors overflow-hidden">
                     {session.sessionThumbnail ? <img
                       src={session.sessionThumbnail}
                       alt={session.name}
-                      className="object-cover rounded-lg w-full h-full max-h-40"
+                      className="object-cover rounded-md w-full h-full max-h-32"
                       style={{ objectFit: 'cover', width: '100%', height: '100%', display: 'block' }}
                     />
-                    : <span className="text-xl">{getSubjectIcon(session.subject)}</span>
+                    : <span className="text-lg">{getSubjectIcon(session.subject)}</span>
                   }
                   </div>
 
                   {/* Content */}
-                  <div className="space-y-1 w-full px-2 pb-2">
+                  <div className="space-y-0.5 w-full px-2 pb-2">
                     <h3 className="font-medium text-gray-900 text-sm leading-tight truncate">
                       {session.name}
                     </h3>
@@ -285,7 +285,7 @@ export default function DashboardPage() {
                             <MoreHorizontal className="h-3 w-3" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-32 shadow-soft-lg border-gray-100">
+                        <DropdownMenuContent align="end" className="w-32 shadow-[0_1px_3px_rgba(0,0,0,0.05)] border-gray-100">
                           <DropdownMenuItem className="text-xs py-1">
                             <Edit className="h-3 w-3 mr-2" />
                             Edit
@@ -312,7 +312,7 @@ export default function DashboardPage() {
         {/* Empty State for when no sessions */}
         {!isLoading && !error && sessions.length === 0 && (
           <div className="flex flex-col justify-start items-start py-8">
-            <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center mb-3">
+            <div className="w-10 h-10 bg-blue-50 rounded-md flex items-center justify-center mb-2">
               <span className="text-xl">📄</span>
             </div>
             <h3 className="text-base font-medium text-gray-900 mb-1">No sessions yet</h3>
@@ -335,7 +335,7 @@ export default function DashboardPage() {
         {/* Error State */}
         {error && (
           <div className="flex flex-col justify-center items-center py-12">
-            <div className="w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center mb-3">
+            <div className="w-10 h-10 bg-red-50 rounded-md flex items-center justify-center mb-2">
               <span className="text-xl">❌</span>
             </div>
             <h3 className="text-base font-medium text-gray-900 mb-1">Failed to load sessions</h3>
