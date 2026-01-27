@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { GlobalContext } from '@/services/contexts/global-context';
 
 // Use proxy in development, full URL in production
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:3000/api/v1';
 
 export const useLogin = () => {
   const { setUser: setUserGlobal } = GlobalContext();
