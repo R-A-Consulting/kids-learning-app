@@ -1,6 +1,14 @@
 import * as React from "react"
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { GraduationCap, Home, LogOut, MessageSquare, Users as UsersIcon, Sparkles } from 'lucide-react';
+import { 
+  GraduationCap, 
+  Home, 
+  LogOut, 
+  Users as UsersIcon, 
+  Sparkles, 
+  FileText,
+  BarChart3,
+} from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -17,12 +25,24 @@ import {
 import { Button } from '@/components/ui/button';
 import { GlobalContext } from '@/services/contexts/global-context';
 
-// Menu items for the sidebar
 const menuItems = [
   {
     title: 'Home',
     icon: Home,
     url: '/dashboard',
+  },
+];
+
+const questionBankItems = [
+  {
+    title: 'Dashboard',
+    icon: BarChart3,
+    url: '/dashboard/question-bank/dashboard',
+  },
+  {
+    title: 'Question Banks',
+    icon: FileText,
+    url: '/dashboard/question-bank',
   },
 ];
 
@@ -60,7 +80,7 @@ export function AppSidebar({ user }) {
   }, [navigate, setUser, location.pathname]);
 
   const isActivePath = React.useCallback(
-    (path) => location.pathname === path,
+    (path) => location.pathname === path || location.pathname.startsWith(path + '/'),
     [location.pathname]
   );
 
@@ -81,6 +101,24 @@ export function AppSidebar({ user }) {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={isActivePath(item.url)}>
+                    <Link to={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Question Bank</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {questionBankItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActivePath(item.url)}>
                     <Link to={item.url}>

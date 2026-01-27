@@ -3,11 +3,12 @@ import { useState, useCallback } from 'react';
 // Use proxy in development, full URL in production
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
-export const useGetUser = () => {
+export const useGetPaper = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [user, setUser] = useState(null);
+  const [paper, setPaper] = useState(null);
 
+  // Helper function for API calls
   const apiRequest = useCallback(async (url, options = {}) => {
     const response = await fetch(`${API_BASE_URL}${url}`, {
       headers: {
@@ -27,37 +28,36 @@ export const useGetUser = () => {
     return data;
   }, []);
 
-  const getUser = useCallback(async (userId) => {
-    if (!userId) {
-      return {
-        success: false,
-        error: 'User ID is required',
-      };
+  // Get a single paper by ID
+  const getPaper = useCallback(async (paperId) => {
+    if (!paperId) {
+      setError('Paper ID is required');
+      return { success: false, error: 'Paper ID is required' };
     }
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await apiRequest(`/users/${userId}`, {
+      const data = await apiRequest(`/papers/${paperId}`, {
         method: 'GET',
       });
 
-      const userData = data.data?.user || data.user || null;
-      setUser(userData);
+      const paperData = data.data?.paper || null;
+      setPaper(paperData);
 
       return {
         success: true,
-        user: userData,
-        message: data.message || 'User retrieved successfully',
+        paper: paperData,
+        message: 'Paper retrieved successfully'
       };
     } catch (err) {
-      const errorMessage = err.message || 'Failed to fetch user';
+      const errorMessage = err.message || 'Failed to fetch paper';
       setError(errorMessage);
 
       return {
         success: false,
-        error: errorMessage,
+        error: errorMessage
       };
     } finally {
       setIsLoading(false);
@@ -68,17 +68,27 @@ export const useGetUser = () => {
     setError(null);
   }, []);
 
-  const clearUser = useCallback(() => {
-    setUser(null);
+  const clearPaper = useCallback(() => {
+    setPaper(null);
+  }, []);
+
+  // Update paper in local state (for optimistic updates)
+  const updateLocalPaper = useCallback((updates) => {
+    setPaper(prev => prev ? { ...prev, ...updates } : null);
   }, []);
 
   return {
+    // State
     isLoading,
     error,
-    user,
-    getUser,
+    paper,
+
+    // Actions
+    getPaper,
+
+    // Utilities
     clearError,
-    clearUser,
+    clearPaper,
+    updateLocalPaper,
   };
 };
-

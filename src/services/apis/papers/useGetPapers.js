@@ -3,9 +3,11 @@ import { useState, useCallback } from 'react';
 // Use proxy in development, full URL in production
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
-export const useUpdatePrompt = () => {
+export const useGetPapers = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [papers, setPapers] = useState([]);
+  const [pagination, setPagination] = useState(null);
 
   // Helper function for API calls
   const apiRequest = useCallback(async (url, options = {}) => {
@@ -27,33 +29,36 @@ export const useUpdatePrompt = () => {
     return data;
   }, []);
 
-  // Update a prompt
-  const updatePrompt = useCallback(async (promptId, updateData) => {
-    if (!promptId) {
-      return {
-        success: false,
-        error: 'Prompt ID is required',
-      };
-    }
-
+  // Get all papers
+  const getPapers = useCallback(async (params = {}) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await apiRequest(`/prompts/${promptId}`, {
-        method: 'PUT',
-        body: JSON.stringify(updateData),
+      const queryParams = new URLSearchParams();
+      if (params.page) queryParams.append('page', params.page);
+      if (params.limit) queryParams.append('limit', params.limit);
+      if (params.questionType) queryParams.append('questionType', params.questionType);
+
+      const queryString = queryParams.toString();
+      const url = `/papers${queryString ? `?${queryString}` : ''}`;
+
+      const data = await apiRequest(url, {
+        method: 'GET',
       });
 
-      const promptData = data.data?.prompt || data.prompt || null;
+      const papersData = data.data?.papers || [];
+      setPapers(papersData);
+      setPagination(data.data?.pagination || null);
 
       return {
         success: true,
-        prompt: promptData,
-        message: data.message || 'Prompt updated successfully'
+        papers: papersData,
+        pagination: data.data?.pagination,
+        message: 'Papers retrieved successfully'
       };
     } catch (err) {
-      const errorMessage = err.message || 'Failed to update prompt';
+      const errorMessage = err.message || 'Failed to fetch papers';
       setError(errorMessage);
 
       return {
@@ -69,16 +74,23 @@ export const useUpdatePrompt = () => {
     setError(null);
   }, []);
 
+  const clearPapers = useCallback(() => {
+    setPapers([]);
+    setPagination(null);
+  }, []);
+
   return {
     // State
     isLoading,
     error,
+    papers,
+    pagination,
 
     // Actions
-    updatePrompt,
+    getPapers,
 
     // Utilities
     clearError,
+    clearPapers,
   };
 };
-

@@ -25,7 +25,7 @@ export default function LoginPage() {
       if (result.success) {
         // Successful login - show success toast and redirect
         setTimeout(() => {
-          navigate('/dashboard')
+          window.location.href = '/dashboard'
         }, 100)
       } else {
         // Failed login - show error toast

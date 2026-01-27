@@ -1,13 +1,14 @@
 import { useState, useCallback } from 'react';
+import { toast } from 'sonner';
 
 // Use proxy in development, full URL in production
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
-export const useGetUser = () => {
+export const useDeletePaper = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [user, setUser] = useState(null);
 
+  // Helper function for API calls
   const apiRequest = useCallback(async (url, options = {}) => {
     const response = await fetch(`${API_BASE_URL}${url}`, {
       headers: {
@@ -27,37 +28,36 @@ export const useGetUser = () => {
     return data;
   }, []);
 
-  const getUser = useCallback(async (userId) => {
-    if (!userId) {
-      return {
-        success: false,
-        error: 'User ID is required',
-      };
+  // Delete a paper
+  const deletePaper = useCallback(async (paperId) => {
+    if (!paperId) {
+      const errorMessage = 'Paper ID is required';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     }
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await apiRequest(`/users/${userId}`, {
-        method: 'GET',
+      const data = await apiRequest(`/papers/${paperId}`, {
+        method: 'DELETE',
       });
 
-      const userData = data.data?.user || data.user || null;
-      setUser(userData);
+      toast.success('Paper deleted successfully');
 
       return {
         success: true,
-        user: userData,
-        message: data.message || 'User retrieved successfully',
+        message: data.message || 'Paper deleted successfully'
       };
     } catch (err) {
-      const errorMessage = err.message || 'Failed to fetch user';
+      const errorMessage = err.message || 'Failed to delete paper';
       setError(errorMessage);
+      toast.error(errorMessage);
 
       return {
         success: false,
-        error: errorMessage,
+        error: errorMessage
       };
     } finally {
       setIsLoading(false);
@@ -68,17 +68,15 @@ export const useGetUser = () => {
     setError(null);
   }, []);
 
-  const clearUser = useCallback(() => {
-    setUser(null);
-  }, []);
-
   return {
+    // State
     isLoading,
     error,
-    user,
-    getUser,
+
+    // Actions
+    deletePaper,
+
+    // Utilities
     clearError,
-    clearUser,
   };
 };
-

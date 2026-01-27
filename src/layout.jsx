@@ -8,11 +8,13 @@ import {
 import { AppSidebar } from '@/components/app-sidebar';
 import { useMe } from '@/services/apis/auth';
 import { Loader2 } from 'lucide-react';
+import { GlobalContext } from '@/services/contexts/global-context';
 
 function AppLayout() {
   const location = useLocation();
   const isDashboard = location.pathname.startsWith('/dashboard');
-  const { getCurrentUser, isLoading, user } = useMe();
+  const { user } = GlobalContext();
+  const { getCurrentUser, isLoading } = useMe();
 
   useEffect(() => {
     getCurrentUser();
