@@ -3,12 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   ArrowLeft,
   FileText,
   Download,
@@ -18,9 +12,6 @@ import {
   RotateCcw,
   Play,
   Pencil,
-  FileJson,
-  FileType,
-  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -38,6 +29,7 @@ import {
 import { subscribeToBank } from '@/services/socket';
 import QuestionCard from '@/components/question-bank/question-card';
 import GenerationProgress from '@/components/question-bank/generation-progress';
+import { ExportModal } from '@/components/question-bank/export-modal';
 
 export default function QuestionBankDetail() {
   const { id } = useParams();
@@ -57,6 +49,12 @@ export default function QuestionBankDetail() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
   const [refiningQuestionId, setRefiningQuestionId] = useState(null);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+
+  const handleExport = async (format, options) => {
+    await exportBank(id, format, options);
+    setExportModalOpen(false);
+  };
 
   useEffect(() => {
     if (id) {
@@ -268,33 +266,20 @@ export default function QuestionBankDetail() {
             </>
           )}
           {questionBank.status === 'COMPLETED' && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9" disabled={isExporting}>
-                  {isExporting ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  ) : (
-                    <Download className="w-4 h-4 mr-2" />
-                  )}
-                  Export
-                  <ChevronDown className="w-3 h-3 ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => exportBank(id, 'pdf')}>
-                  <FileText className="w-4 h-4 mr-2 text-red-500" />
-                  Export as PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportBank(id, 'docx')}>
-                  <FileType className="w-4 h-4 mr-2 text-blue-500" />
-                  Export as Word
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportBank(id, 'json')}>
-                  <FileJson className="w-4 h-4 mr-2 text-amber-500" />
-                  Export as JSON
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => setExportModalOpen(true)}
+              disabled={isExporting}
+            >
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              Export
+            </Button>
           )}
         </div>
       </header>
@@ -595,6 +580,12 @@ export default function QuestionBankDetail() {
         </div>
         </div>
       )}
+      <ExportModal
+        open={exportModalOpen}
+        onOpenChange={setExportModalOpen}
+        onExport={handleExport}
+        isLoading={isExporting}
+      />
     </div>
   );
 }

@@ -11,12 +11,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   Plus,
   FileText,
   Trash2,
@@ -25,12 +19,11 @@ import {
   XCircle,
   AlertCircle,
   Download,
-  FileJson,
-  FileType,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useGetQuestionBanks, useDeleteQuestionBank, useExportQuestionBank } from '@/services/apis/question-banks';
 import { getSocket, onBankUpdate, joinBankRoom, leaveBankRoom } from '@/services/socket';
+import { ExportModal } from '@/components/question-bank/export-modal';
 
 export default function QuestionBankList() {
   const navigate = useNavigate();
@@ -39,13 +32,19 @@ export default function QuestionBankList() {
   const { exportBank, isLoading: isExporting } = useExportQuestionBank();
   const [localBanks, setLocalBanks] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
-  const [exportingId, setExportingId] = useState(null);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [selectedBankId, setSelectedBankId] = useState(null);
 
-  const handleExport = async (bankId, format, e) => {
+  const handleExport = async (format, options) => {
+    await exportBank(selectedBankId, format, options);
+    setExportModalOpen(false);
+    setSelectedBankId(null);
+  };
+
+  const openExportModal = (bankId, e) => {
     e?.stopPropagation();
-    setExportingId(bankId);
-    await exportBank(bankId, format);
-    setExportingId(null);
+    setSelectedBankId(bankId);
+    setExportModalOpen(true);
   };
 
   useEffect(() => {
@@ -295,36 +294,19 @@ export default function QuestionBankList() {
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                             {bank.status === 'COMPLETED' && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                    disabled={exportingId === bank._id}
-                                  >
-                                    {exportingId === bank._id ? (
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                    ) : (
-                                      <Download className="w-4 h-4 text-neutral-500" />
-                                    )}
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={(e) => handleExport(bank._id, 'pdf', e)}>
-                                    <FileText className="w-4 h-4 mr-2 text-red-500" />
-                                    Export as PDF
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => handleExport(bank._id, 'docx', e)}>
-                                    <FileType className="w-4 h-4 mr-2 text-blue-500" />
-                                    Export as Word
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => handleExport(bank._id, 'json', e)}>
-                                    <FileJson className="w-4 h-4 mr-2 text-amber-500" />
-                                    Export as JSON
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={(e) => openExportModal(bank._id, e)}
+                                disabled={isExporting && selectedBankId === bank._id}
+                              >
+                                {isExporting && selectedBankId === bank._id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Download className="w-4 h-4 text-neutral-500" />
+                                )}
+                              </Button>
                             )}
                             <Button
                               variant="ghost"
@@ -350,6 +332,12 @@ export default function QuestionBankList() {
           )}
         </div>
       </div>
+      <ExportModal
+        open={exportModalOpen}
+        onOpenChange={setExportModalOpen}
+        onExport={handleExport}
+        isLoading={isExporting}
+      />
     </div>
   );
 }

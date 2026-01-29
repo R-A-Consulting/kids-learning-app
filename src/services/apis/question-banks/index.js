@@ -534,20 +534,28 @@ export function useExportQuestionBank() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const exportBank = useCallback(async (bankId, format = 'json') => {
+  const exportBank = useCallback(async (bankId, format = 'json', options = {}) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(`${API_BASE_URL}/question-banks/${bankId}/export?format=${format}`, {
-        credentials: 'include',
-      });
+      // Build query params with options
+      const params = new URLSearchParams({ format });
+      if (options.includeAnswers) params.append('includeAnswers', 'true');
+      if (options.includeHints) params.append('includeHints', 'true');
+      if (options.includeExplanations) params.append('includeExplanations', 'true');
+
+      const response = await fetch(
+        `${API_BASE_URL}/question-banks/${bankId}/export?${params}`,
+        { credentials: 'include' }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Export failed');
       }
 
+      // Handle JSON format separately (parse and re-stringify)
       if (format === 'json') {
         const data = await response.json();
         const jsonString = JSON.stringify(data.data, null, 2);
@@ -557,7 +565,7 @@ export function useExportQuestionBank() {
         
         if (contentDisposition) {
           const match = contentDisposition.match(/filename="(.+)"/);
-          if (match) filename = match[1].replace(/\.(pdf|docx)$/, '.json');
+          if (match) filename = match[1].replace(/\.(pdf|docx|txt|csv|md)$/, '.json');
         } else {
           const questionBankTitle = data.data?.questionBank?.title || 'question-bank';
           filename = `${questionBankTitle.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.json`;
@@ -575,10 +583,10 @@ export function useExportQuestionBank() {
         return { success: true };
       }
 
-      // For PDF and DOCX, trigger download
+      // For all other formats (pdf, docx, txt, csv, markdown), download as blob
       const blob = await response.blob();
       const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `export.${format}`;
+      let filename = `export.${format === 'markdown' ? 'md' : format}`;
       
       if (contentDisposition) {
         const match = contentDisposition.match(/filename="(.+)"/);
