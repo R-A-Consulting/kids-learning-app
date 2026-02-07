@@ -16,7 +16,6 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle2,
-  Flag,
   Loader2,
   Lightbulb,
   BookOpen,
@@ -25,6 +24,10 @@ import {
   MoreVertical,
   Check,
   Save,
+  RefreshCw,
+  Wrench,
+  XCircle,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -58,7 +61,9 @@ export default function QuestionCard({
   onDelete,
   onRefine,
   onStatusChange,
+  onRegenerate,
   isRefining = false,
+  bankId,
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [refineDialogOpen, setRefineDialogOpen] = useState(false);
@@ -115,9 +120,8 @@ export default function QuestionCard({
   return (
     <div
       className={cn(
-        'group relative bg-white rounded-xl border shadow-sm transition-all duration-200 hover:shadow-md',
+        'group relative bg-white rounded-xl border shadow-sm transition-all duration-200 hover:shadow-md overflow-hidden',
         question.status === 'APPROVED' ? 'border-emerald-100 ring-1 ring-emerald-50' :
-        question.status === 'FLAGGED' ? 'border-amber-100 ring-1 ring-amber-50' :
         question.status === 'REJECTED' ? 'border-red-100 ring-1 ring-red-50' :
         'border-neutral-100 hover:border-neutral-200'
       )}
@@ -126,16 +130,26 @@ export default function QuestionCard({
       <div className={cn(
         'absolute left-0 top-4 bottom-4 w-1 rounded-r-full transition-colors',
         question.status === 'APPROVED' ? 'bg-emerald-400' :
-        question.status === 'FLAGGED' ? 'bg-amber-400' :
         question.status === 'REJECTED' ? 'bg-red-400' :
         'bg-transparent'
       )} />
 
-      <div className="p-3 pl-4">
+      <div className="p-3 pl-4 min-w-0">
         {/* Header: Badges & Actions */}
         <div className="flex items-start justify-between mb-2.5">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] font-bold text-neutral-400">Q{index}</span>
+            {/* Confidence Dot */}
+            {question.confidence != null && (
+              <span
+                className={cn(
+                  "w-2.5 h-2.5 rounded-full shrink-0",
+                  question.confidence >= 0.8 ? "bg-emerald-400" :
+                  question.confidence >= 0.6 ? "bg-amber-400" : "bg-red-400"
+                )}
+                title={`Confidence: ${(question.confidence * 100).toFixed(0)}%`}
+              />
+            )}
             <span className={cn(
               'text-[9px] font-medium px-2 py-0.5 rounded-full border',
               question.type === 'MCQ' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-purple-50 text-purple-700 border-purple-100'
@@ -157,6 +171,35 @@ export default function QuestionCard({
             <span className="text-[9px] text-neutral-400 font-medium">
               {question.marks}m
             </span>
+            {/* Auto-fixed Badge */}
+            {(question.autoFixed || question.verificationStatus === 'FIXED') && (
+              <span
+                className="flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100"
+                title={question.fixedFields?.length ? `Fixed: ${question.fixedFields.join(', ')}` : 'Auto-corrected by AI'}
+              >
+                <Wrench className="w-3 h-3" />
+                Auto-fixed
+              </span>
+            )}
+            {/* Verification Badge */}
+            {question.verificationStatus === 'VERIFIED' && (
+              <span className="flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
+                <ShieldCheck className="w-3 h-3" />
+                Verified
+              </span>
+            )}
+            {question.verificationStatus === 'REJECTED' && (
+              <span className="flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100">
+                <XCircle className="w-3 h-3" />
+                Rejected
+              </span>
+            )}
+            {question.status === 'REGENERATING' && (
+              <span className="flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-100">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Regenerating
+              </span>
+            )}
           </div>
 
           {/* Action Toolbar - Visible on Hover or Editing */}
@@ -208,9 +251,11 @@ export default function QuestionCard({
                     <DropdownMenuItem onClick={() => onStatusChange(question._id, 'APPROVED')} className="text-emerald-600">
                       <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Approve
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onStatusChange(question._id, 'FLAGGED')} className="text-amber-600">
-                      <Flag className="w-3.5 h-3.5 mr-2" /> Flag
-                    </DropdownMenuItem>
+                    {onRegenerate && (
+                      <DropdownMenuItem onClick={() => onRegenerate(question._id)} className="text-violet-600">
+                        <RefreshCw className="w-3.5 h-3.5 mr-2" /> Regenerate
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => onDelete(question._id)} className="text-red-600">
                       <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
                     </DropdownMenuItem>
@@ -222,7 +267,7 @@ export default function QuestionCard({
         </div>
 
         {/* Question Stem */}
-        <div className="mb-3">
+        <div className="mb-3 min-w-0 overflow-hidden">
           {isEditing ? (
             <Textarea
               value={editedQuestion.text}
@@ -271,7 +316,7 @@ export default function QuestionCard({
                     />
                   </div>
                 ) : (
-                  <div className="flex-1 text-xs text-neutral-700 pt-0.5">
+                  <div className="flex-1 min-w-0 text-xs text-neutral-700 pt-0.5 break-words">
                     <MessageFormatter inline>{opt.text}</MessageFormatter>
                   </div>
                 )}
@@ -294,6 +339,17 @@ export default function QuestionCard({
                   )
                 )}
               </div>
+            ))}
+          </div>
+        )}
+
+        {/* Concepts Tags */}
+        {question.conceptsTested?.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {question.conceptsTested.map((concept, i) => (
+              <span key={i} className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 border border-neutral-150">
+                {concept}
+              </span>
             ))}
           </div>
         )}
@@ -409,6 +465,39 @@ export default function QuestionCard({
                       <Plus className="w-3 h-3 mr-1" /> Add Hint
                     </Button>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Verification Issues */}
+            {question.verificationIssues?.length > 0 && (
+              <div>
+                <Label className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mb-1 block">
+                  Verification Issues
+                </Label>
+                <div className="p-2 rounded-md bg-amber-50/50 border border-amber-100 text-xs text-amber-700">
+                  {question.verificationIssues.map((issue, i) => (
+                    <p key={i} className="flex items-start gap-1">
+                      <span className="text-amber-400 mt-0.5">•</span>
+                      {issue}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Fixed Fields Info */}
+            {question.autoFixed && question.fixedFields?.length > 0 && (
+              <div>
+                <Label className="text-[9px] font-bold text-blue-400 uppercase tracking-wider mb-1 block">
+                  Auto-corrected Fields
+                </Label>
+                <div className="flex flex-wrap gap-1">
+                  {question.fixedFields.map((field, i) => (
+                    <span key={i} className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100">
+                      {field}
+                    </span>
+                  ))}
                 </div>
               </div>
             )}

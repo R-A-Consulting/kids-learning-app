@@ -113,8 +113,17 @@ export function subscribeToBank(bankId, handlers) {
         onSectionCompleted,
         onSectionShortfall,
         onQuestionGenerated,
+        onQuestionsBatch,
         onCompleted,
         onFailed,
+        // Turbo pipeline v2 events
+        onPhaseChange,
+        onDocumentStatus,
+        onQuestionVerified,
+        onVerificationCompleted,
+        // Turbo pipeline v3 events (auto-fix)
+        onQuestionUpdated,
+        onQuestionRejected,
     } = handlers;
     
     joinBankRoom(bankId);
@@ -140,6 +149,12 @@ export function subscribeToBank(bankId, handlers) {
             case 'question_generated':
                 onQuestionGenerated?.(data.question, data);
                 break;
+            case 'questions_batch':
+                onQuestionsBatch?.(data.questions, data);
+                if (Array.isArray(data.questions)) {
+                    data.questions.forEach((q) => onQuestionGenerated?.(q, data));
+                }
+                break;
             case 'generation_completed':
                 onCompleted?.(data.questionBank, data);
                 break;
@@ -147,6 +162,26 @@ export function subscribeToBank(bankId, handlers) {
                 onFailed?.(data.error, data);
                 break;
             case 'question_refined':
+                break;
+            // Turbo pipeline v2 events
+            case 'phase_change':
+                onPhaseChange?.(data.phase, data);
+                break;
+            case 'document_status':
+                onDocumentStatus?.(data.documentId, data);
+                break;
+            case 'question_verified':
+                onQuestionVerified?.(data.results, data);
+                break;
+            case 'verification_completed':
+                onVerificationCompleted?.(data);
+                break;
+            // Turbo pipeline v3 events (auto-fix)
+            case 'question_updated':
+                onQuestionUpdated?.(data.question, data);
+                break;
+            case 'question_rejected':
+                onQuestionRejected?.(data.questionId, data);
                 break;
             default:
                 console.log('[Socket.IO] Unknown update type:', data.type);

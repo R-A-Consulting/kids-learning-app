@@ -433,7 +433,11 @@ export default function AIQuestionsPage() {
                     min="1"
                     max="50"
                     value={numberOfQuestions}
-                    onChange={(e) => setNumberOfQuestions(parseInt(e.target.value) || 1)}
+                    onChange={(e) => setNumberOfQuestions(e.target.value)}
+                    onBlur={() => {
+                      const n = parseInt(numberOfQuestions);
+                      setNumberOfQuestions(isNaN(n) || n < 1 ? 1 : n > 50 ? 50 : n);
+                    }}
                     className="w-full h-10 px-3 text-[13px] bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
                   />
                 </div>

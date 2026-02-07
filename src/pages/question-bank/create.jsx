@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,6 +24,7 @@ import {
   FileText,
   Settings,
   Sparkles,
+  RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -31,7 +33,10 @@ import {
   useAddSourceDocument,
   useStartGeneration,
   useGetQuestionBank,
+  useRetryDocumentProcessing,
+  useRemoveSourceDocument,
 } from '@/services/apis/question-banks';
+import { subscribeToBank } from '@/services/socket';
 
 const CURRICULA = ['CBSE', 'ICSE', 'IB', 'IGCSE', 'STATE', 'CUSTOM'];
 const GRADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -57,6 +62,8 @@ export default function CreateQuestionBank() {
   const { addSourceDocument, cancelUpload, isLoading: isUploading, progress: uploadProgress } = useAddSourceDocument();
   const { startGeneration, isLoading: isStarting } = useStartGeneration();
   const { questionBank: existingBank, sections: existingSections, getQuestionBank, isLoading: isLoadingBank } = useGetQuestionBank();
+  const { retryDocument, isLoading: isRetryingDoc } = useRetryDocumentProcessing();
+  const { removeDocument, isLoading: isRemovingDoc } = useRemoveSourceDocument();
 
   const [step, setStep] = useState(1);
   const [createdBankId, setCreatedBankId] = useState(null);
@@ -76,6 +83,8 @@ export default function CreateQuestionBank() {
   const [isDragging, setIsDragging] = useState(false);
   const [sourceMode, setSourceMode] = useState('HYBRID');
   const [currentUploadIndex, setCurrentUploadIndex] = useState(-1);
+  const [existingDocuments, setExistingDocuments] = useState([]); // Existing docs from edit mode
+  const [allDocsReady, setAllDocsReady] = useState(true); // Track if all docs are processed
 
   // Step 3: Sections
   const [sections, setSections] = useState([
@@ -107,7 +116,29 @@ export default function CreateQuestionBank() {
       setTopic(existingBank.topic || '');
       setExamPattern(existingBank.examPattern || 'BOARD');
       setSourceMode(existingBank.sourceMode || 'HYBRID');
-      
+
+      // Pre-fill existing documents
+      if (existingBank.sourceDocuments?.length > 0) {
+        setExistingDocuments(existingBank.sourceDocuments.map(doc => ({
+          _id: doc._id,
+          name: doc.filename,
+          type: doc.type,
+          processingStatus: doc.processingStatus || 'COMPLETED',
+          hasContent: doc.hasContent,
+          contentLength: doc.contentLength || 0,
+          isExisting: true
+        })));
+        // Check if all existing docs are ready
+        const allReady = existingBank.sourceDocuments.every(d =>
+          d.processingStatus === 'COMPLETED' || d.processingStatus === 'FAILED'
+        );
+        setAllDocsReady(allReady);
+        // If some docs are still processing, start polling
+        if (!allReady) {
+          setIsPollingDocs(true);
+        }
+      }
+
       // Pre-fill sections if they exist
       if (existingSections && existingSections.length > 0) {
         setSections(existingSections.map(s => ({
@@ -124,6 +155,155 @@ export default function CreateQuestionBank() {
       setIsInitialized(true);
     }
   }, [isEditMode, existingBank, existingSections, isInitialized]);
+
+  // Track whether we need to poll for document processing
+  const [isPollingDocs, setIsPollingDocs] = useState(false);
+  const pollingRef = useRef(null);
+
+  // Start polling when files are uploaded and processing
+  const startDocPolling = useCallback(() => {
+    setIsPollingDocs(true);
+    setAllDocsReady(false);
+  }, []);
+
+  // Poll document processing status
+  useEffect(() => {
+    if (!createdBankId || !isPollingDocs) return;
+
+    const poll = async () => {
+      try {
+        const result = await getQuestionBank(createdBankId);
+        // getQuestionBank returns response.data = { questionBank, sections }
+        const docs = result?.questionBank?.sourceDocuments;
+        if (docs && docs.length > 0) {
+          setExistingDocuments(docs.map(doc => ({
+            _id: doc._id,
+            name: doc.filename,
+            type: doc.type,
+            processingStatus: doc.processingStatus || 'COMPLETED',
+            hasContent: doc.hasContent,
+            contentLength: doc.contentLength || 0,
+            isExisting: true
+          })));
+
+          const allDone = docs.every(d =>
+            d.processingStatus === 'COMPLETED' || d.processingStatus === 'FAILED'
+          );
+          if (allDone) {
+            setAllDocsReady(true);
+            setIsPollingDocs(false);
+            // Clear processing statuses for newly uploaded files
+            setFileStatuses(prev => {
+              const updated = { ...prev };
+              Object.keys(updated).forEach(key => {
+                if (updated[key].status === 'processing') {
+                  updated[key] = { status: 'completed', progress: 100 };
+                }
+              });
+              return updated;
+            });
+          }
+        }
+      } catch (e) {
+        // Polling failure is non-fatal
+      }
+    };
+
+    // Poll immediately once, then every 3 seconds
+    poll();
+    pollingRef.current = setInterval(poll, 3000);
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [createdBankId, isPollingDocs, getQuestionBank]);
+
+  // Subscribe to socket events for real-time document status updates
+  useEffect(() => {
+    if (!createdBankId) return;
+
+    const unsubscribe = subscribeToBank(createdBankId, {
+      onDocumentStatus: (documentId, data) => {
+        console.log('[Create] Document status update:', data);
+        const { filename, processingStatus, contentLength } = data;
+        
+        // Update existingDocuments by matching filename or _id, and check if all done
+        setExistingDocuments(prev => {
+          const updated = prev.map(doc => {
+            if (doc._id === documentId || doc.name === filename) {
+              return {
+                ...doc,
+                processingStatus,
+                contentLength: contentLength || doc.contentLength,
+                isExisting: true
+              };
+            }
+            return doc;
+          });
+
+          // Check if all docs are now done (using the updated array)
+          const allDone = updated.length > 0 && updated.every(d =>
+            d.processingStatus === 'COMPLETED' || d.processingStatus === 'FAILED'
+          );
+          if (allDone) {
+            setAllDocsReady(true);
+            setIsPollingDocs(false);
+            // Clear processing statuses for newly uploaded files
+            setFileStatuses(prevStatuses => {
+              const updatedStatuses = { ...prevStatuses };
+              Object.keys(updatedStatuses).forEach(key => {
+                if (updatedStatuses[key].status === 'processing') {
+                  updatedStatuses[key] = { status: 'completed', progress: 100 };
+                }
+              });
+              return updatedStatuses;
+            });
+          }
+
+          return updated;
+        });
+      },
+      onStatusChange: (status) => {
+        if (status === 'READY') {
+          setAllDocsReady(true);
+          setIsPollingDocs(false);
+        }
+      },
+    });
+
+    return () => unsubscribe();
+  }, [createdBankId]);
+
+  const handleRemoveDocument = async (docId, docName) => {
+    if (!createdBankId || !docId) return;
+    if (!confirm(`Remove "${docName}"? This cannot be undone.`)) return;
+    const result = await removeDocument(createdBankId, docId);
+    if (result.success) {
+      setExistingDocuments(prev => prev.filter(d => d._id !== docId));
+      toast.success(`Removed ${docName}`);
+    } else {
+      toast.error(`Failed to remove ${docName}: ${result.error}`);
+    }
+  };
+
+  const handleRetryDocument = async (docId, docName) => {
+    if (!createdBankId || !docId) return;
+    // Update UI immediately
+    setExistingDocuments(prev =>
+      prev.map(d => d._id === docId ? { ...d, processingStatus: 'PENDING' } : d)
+    );
+    setAllDocsReady(false);
+    const result = await retryDocument(createdBankId, docId);
+    if (!result.success) {
+      toast.error(`Failed to retry ${docName}: ${result.error}`);
+      setExistingDocuments(prev =>
+        prev.map(d => d._id === docId ? { ...d, processingStatus: 'FAILED' } : d)
+      );
+    }
+  };
 
   const totalQuestions = sections.reduce((sum, s) => sum + s.targetCount, 0);
   const totalMarks = sections.reduce((sum, s) => sum + s.targetCount * s.marksPerQuestion, 0);
@@ -244,46 +424,53 @@ export default function CreateQuestionBank() {
         }
       }
     } else if (step === 2) {
-      // Upload documents with status tracking
+      // Upload documents in parallel with status tracking
       if (createdBankId && uploadedFiles.length > 0) {
-        for (let i = 0; i < uploadedFiles.length; i++) {
-          const file = uploadedFiles[i];
-          setCurrentUploadIndex(i);
-          setFileStatuses(prev => ({
-            ...prev,
-            [i]: { status: 'uploading', progress: 0 }
-          }));
-          
-          try {
-            const result = await addSourceDocument(createdBankId, file);
-            
-            if (result.success) {
+        // Mark all as uploading
+        const initialStatuses = {};
+        uploadedFiles.forEach((_, i) => {
+          initialStatuses[i] = { status: 'uploading', progress: 0 };
+        });
+        setFileStatuses(prev => ({ ...prev, ...initialStatuses }));
+
+        // Upload all files in parallel
+        const uploadPromises = uploadedFiles.map((file, i) => {
+          return addSourceDocument(createdBankId, file)
+            .then(result => {
+              if (result.success) {
+                setFileStatuses(prev => ({
+                  ...prev,
+                  [i]: {
+                    status: result.processingStarted ? 'processing' : 'completed',
+                    progress: 100
+                  }
+                }));
+              } else if (result.cancelled) {
+                setFileStatuses(prev => ({
+                  ...prev,
+                  [i]: { status: 'cancelled', progress: 0 }
+                }));
+              } else {
+                setFileStatuses(prev => ({
+                  ...prev,
+                  [i]: { status: 'failed', error: result.error, progress: 0 }
+                }));
+              }
+            })
+            .catch(err => {
               setFileStatuses(prev => ({
                 ...prev,
-                [i]: { 
-                  status: result.processingStarted ? 'processing' : 'completed',
-                  progress: 100 
-                }
+                [i]: { status: 'failed', error: err.message, progress: 0 }
               }));
-            } else if (result.cancelled) {
-              setFileStatuses(prev => ({
-                ...prev,
-                [i]: { status: 'cancelled', progress: 0 }
-              }));
-            } else {
-              setFileStatuses(prev => ({
-                ...prev,
-                [i]: { status: 'failed', error: result.error, progress: 0 }
-              }));
-            }
-          } catch (err) {
-            setFileStatuses(prev => ({
-              ...prev,
-              [i]: { status: 'failed', error: err.message, progress: 0 }
-            }));
-          }
-        }
+            });
+        });
+
+        await Promise.allSettled(uploadPromises);
         setCurrentUploadIndex(-1);
+
+        // Start polling to track document processing status
+        // We always poll after upload since processing happens asynchronously
+        startDocPolling();
       }
       setStep(3);
     } else if (step === 3) {
@@ -302,7 +489,12 @@ export default function CreateQuestionBank() {
           // In edit mode, just save and go back to detail page
           navigate(`/dashboard/question-bank/${createdBankId}`);
         } else {
-          // In create mode, start generation
+          // In create mode, check doc readiness before starting generation
+          const hasUploadedDocs = existingDocuments.length > 0 || uploadedFiles.length > 0;
+          if (hasUploadedDocs && !allDocsReady) {
+            toast.warning('Documents are still processing. Please wait for all documents to finish before generating.');
+            return;
+          }
           await startGeneration(createdBankId);
           navigate(`/dashboard/question-bank/${createdBankId}`);
         }
@@ -313,7 +505,14 @@ export default function CreateQuestionBank() {
   // Handler to save and start generation (for edit mode)
   const handleSaveAndGenerate = async () => {
     if (!createdBankId) return;
-    
+
+    // Block if documents are still processing
+    const hasUploadedDocs = existingDocuments.length > 0 || uploadedFiles.length > 0;
+    if (hasUploadedDocs && !allDocsReady) {
+      toast.warning('Documents are still processing. Please wait for all documents to finish before generating.');
+      return;
+    }
+
     const result = await updateQuestionBank(createdBankId, {
       sections,
     });
@@ -558,6 +757,97 @@ export default function CreateQuestionBank() {
                 </div>
               </div>
 
+              {/* Existing Documents (edit mode) */}
+              {existingDocuments.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[12px] font-medium text-neutral-700">
+                    Previously Uploaded Documents
+                  </p>
+                  {existingDocuments.map((doc, index) => (
+                    <div
+                      key={doc._id || index}
+                      className={cn(
+                        "flex items-center gap-3 p-3 border rounded-lg",
+                        doc.processingStatus === 'COMPLETED'
+                          ? 'bg-emerald-50 border-emerald-200'
+                          : doc.processingStatus === 'FAILED'
+                          ? 'bg-red-50 border-red-200'
+                          : doc.processingStatus === 'PROCESSING'
+                          ? 'bg-amber-50 border-amber-200'
+                          : 'bg-neutral-50 border-neutral-200'
+                      )}
+                    >
+                      {doc.processingStatus === 'COMPLETED' ? (
+                        <Check className="w-5 h-5 text-emerald-500" />
+                      ) : doc.processingStatus === 'FAILED' ? (
+                        <X className="w-5 h-5 text-red-500" />
+                      ) : doc.processingStatus === 'PROCESSING' ? (
+                        <Loader2 className="w-5 h-5 text-amber-500 animate-spin" />
+                      ) : (
+                        <Loader2 className="w-5 h-5 text-violet-500 animate-spin" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[13px] font-medium text-neutral-700 truncate block">
+                          {doc.name}
+                        </span>
+                        <span className="text-[10px] text-neutral-500">
+                          {doc.processingStatus === 'COMPLETED'
+                            ? `Processed${doc.contentLength ? ` • ${Math.round(doc.contentLength / 1000)}K chars extracted` : ''}`
+                            : doc.processingStatus === 'FAILED'
+                            ? 'Processing failed'
+                            : doc.processingStatus === 'PROCESSING'
+                            ? 'Processing document...'
+                            : 'Waiting to process...'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-neutral-400 uppercase shrink-0">
+                        {doc.type}
+                      </span>
+                      {doc.processingStatus === 'FAILED' && doc._id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRetryDocument(doc._id, doc.name);
+                          }}
+                          disabled={isRetryingDoc}
+                          className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-red-600 bg-red-100 hover:bg-red-200 rounded transition-colors disabled:opacity-50"
+                          title="Retry processing"
+                        >
+                          {isRetryingDoc ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <RotateCcw className="w-3 h-3" />
+                          )}
+                          Retry
+                        </button>
+                      )}
+                      {doc._id && doc.processingStatus !== 'PROCESSING' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveDocument(doc._id, doc.name);
+                          }}
+                          disabled={isRemovingDoc}
+                          className="p-1 hover:bg-red-100 rounded text-neutral-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                          title="Remove document"
+                        >
+                          {isRemovingDoc ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {uploadedFiles.length === 0 && (
+                    <p className="text-[11px] text-neutral-500 mt-1">
+                      You can upload additional documents below
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Upload Area */}
               <div
                 className={cn(
@@ -693,6 +983,21 @@ export default function CreateQuestionBank() {
           {/* Step 3: Configure Sections */}
           {step === 3 && (
             <div className="space-y-4">
+              {/* Document Processing Warning */}
+              {!allDocsReady && (existingDocuments.length > 0 || uploadedFiles.length > 0) && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+                  <Loader2 className="w-5 h-5 text-amber-500 animate-spin mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[13px] font-medium text-amber-800">
+                      Documents are still being processed
+                    </p>
+                    <p className="text-[11px] text-amber-600 mt-0.5">
+                      You can configure sections while documents are processing.
+                      Generation will be available once all documents are ready.
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="bg-white rounded-xl border border-neutral-200 p-6 shadow-sm">
                 <div className="flex items-center justify-between pb-4 border-b">
                   <div className="flex items-center gap-3">
@@ -758,7 +1063,11 @@ export default function CreateQuestionBank() {
                             min="1"
                             max="50"
                             value={section.targetCount}
-                            onChange={(e) => updateSection(index, 'targetCount', parseInt(e.target.value) || 1)}
+                            onChange={(e) => updateSection(index, 'targetCount', e.target.value)}
+                            onBlur={(e) => {
+                              const n = parseInt(e.target.value);
+                              updateSection(index, 'targetCount', isNaN(n) || n < 1 ? 1 : n > 50 ? 50 : n);
+                            }}
                             className="w-full h-9 px-2 text-[12px] bg-white border border-neutral-200 rounded-lg"
                           />
                         </div>
@@ -785,7 +1094,11 @@ export default function CreateQuestionBank() {
                             min="1"
                             max="20"
                             value={section.marksPerQuestion}
-                            onChange={(e) => updateSection(index, 'marksPerQuestion', parseInt(e.target.value) || 1)}
+                            onChange={(e) => updateSection(index, 'marksPerQuestion', e.target.value)}
+                            onBlur={(e) => {
+                              const n = parseInt(e.target.value);
+                              updateSection(index, 'marksPerQuestion', isNaN(n) || n < 1 ? 1 : n > 20 ? 20 : n);
+                            }}
                             className="w-full h-9 px-2 text-[12px] bg-white border border-neutral-200 rounded-lg"
                           />
                         </div>

@@ -459,7 +459,6 @@ export function useUpdateQuestionStatus() {
       setIsLoading(true);
       setError(null);
       const data = { status };
-      if (status === 'FLAGGED' && reason) data.flagReason = reason;
       if (status === 'REJECTED' && reason) data.rejectionReason = reason;
       
       const response = await apiRequest(`/questions/${questionId}/status`, {
@@ -528,6 +527,162 @@ export function useRetryGeneration() {
   }, []);
 
   return { retryGeneration, isLoading, error };
+}
+
+/**
+ * Hook to remove a source document from a question bank
+ */
+export function useRemoveSourceDocument() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const removeDocument = useCallback(async (bankId, docId) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await apiRequest(`/question-banks/${bankId}/documents/${docId}`, {
+        method: 'DELETE',
+      });
+      return { success: true, ...response.data };
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { removeDocument, isLoading, error };
+}
+
+export function useRetryDocumentProcessing() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const retryDocument = useCallback(async (bankId, docId) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await apiRequest(`/question-banks/${bankId}/documents/${docId}/retry`, {
+        method: 'POST',
+      });
+      return { success: true, ...response.data };
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { retryDocument, isLoading, error };
+}
+
+/**
+ * Hook to bulk update question statuses
+ */
+export function useBulkUpdateQuestions() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const bulkUpdateStatus = useCallback(async (bankId, questionIds, status) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await apiRequest(`/question-banks/${bankId}/questions/bulk-status`, {
+        method: 'POST',
+        body: JSON.stringify({ questionIds, status }),
+      });
+      return { success: true, ...response.data };
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { bulkUpdateStatus, isLoading, error };
+}
+
+/**
+ * Hook to bulk delete questions
+ */
+export function useBulkDeleteQuestions() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const bulkDelete = useCallback(async (bankId, questionIds) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await apiRequest(`/question-banks/${bankId}/questions/bulk-delete`, {
+        method: 'POST',
+        body: JSON.stringify({ questionIds }),
+      });
+      return { success: true, ...response.data };
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { bulkDelete, isLoading, error };
+}
+
+/**
+ * Hook to regenerate a single question
+ */
+export function useRegenerateQuestion() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const regenerateQuestion = useCallback(async (bankId, questionId) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await apiRequest(`/question-banks/${bankId}/questions/${questionId}/regenerate`, {
+        method: 'POST',
+      });
+      return { success: true, ...response.data };
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { regenerateQuestion, isLoading, error };
+}
+
+/**
+ * Hook to generate more questions for a section
+ */
+export function useGenerateMore() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const generateMore = useCallback(async (bankId, sectionId, count = 5) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await apiRequest(`/question-banks/${bankId}/generate-more`, {
+        method: 'POST',
+        body: JSON.stringify({ sectionId, count }),
+      });
+      return { success: true, ...response.data };
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { generateMore, isLoading, error };
 }
 
 export function useExportQuestionBank() {
