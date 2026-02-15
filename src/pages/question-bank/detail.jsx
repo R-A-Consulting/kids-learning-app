@@ -19,7 +19,6 @@ import {
   AlertCircle,
   RotateCcw,
   Play,
-  Pencil,
   RefreshCw,
   Search,
   Plus,
@@ -45,7 +44,7 @@ import {
   useRegenerateQuestion,
   useGenerateMore,
 } from '@/services/apis/question-banks';
-import { subscribeToBank } from '@/services/socket';
+import { getSocket, joinBankRoom, leaveBankRoom, onBankUpdate } from '@/services/socket';
 import QuestionCard from '@/components/question-bank/question-card';
 import GenerationProgress from '@/components/question-bank/generation-progress';
 import { ExportModal } from '@/components/question-bank/export-modal';
@@ -192,30 +191,48 @@ export default function QuestionBankDetail() {
     }
   }, [questionBank]);
 
-  // Socket subscription for real-time updates
+  // Always-on socket room subscription — keeps the socket in the bank room
+  // for the entire lifecycle of this page so events are never missed
+  useEffect(() => {
+    if (!id) return;
+
+    const socket = getSocket();
+    joinBankRoom(id);
+
+    return () => {
+      leaveBankRoom(id);
+    };
+  }, [id]);
+
+  // Generation-specific event handler (only active while generating)
   useEffect(() => {
     if (!id || !isGenerating) return;
 
-    const cleanup = subscribeToBank(id, {
-      onStatusChange: (status) => {
-        if (status === 'COMPLETED' || status === 'FAILED') {
+    const handleUpdate = (data) => {
+      if (data.bankId !== id) return;
+
+      if (data.type === 'status_change') {
+        if (data.status === 'COMPLETED' || data.status === 'FAILED') {
           setIsGenerating(false);
           getQuestionBank(id);
           getQuestions(id);
         }
-      },
-      onCompleted: () => {
+      } else if (data.type === 'generation_completed') {
         setIsGenerating(false);
         getQuestionBank(id);
         getQuestions(id);
-      },
-      onFailed: () => {
+      } else if (data.type === 'generation_failed') {
         setIsGenerating(false);
         getQuestionBank(id);
-      },
-    });
+      }
+    };
 
-    return cleanup;
+    const unsubscribe = onBankUpdate(handleUpdate);
+
+    return () => {
+      unsubscribe();
+      // DON'T leaveBankRoom here — room lifecycle managed by the always-on effect above
+    };
   }, [id, isGenerating, getQuestionBank, getQuestions]);
 
   const filteredQuestions = useMemo(() => {
@@ -278,14 +295,20 @@ export default function QuestionBankDetail() {
 
   const handleResetBank = async () => {
     const result = await resetBank(id);
-    if (result.success) getQuestionBank(id);
+    if (result.success) {
+      setQuestions([]);        // clear stale questions immediately
+      getQuestionBank(id);
+      getQuestions(id);        // also refresh from backend
+    }
   };
 
   const handleRetryGeneration = async () => {
     const result = await retryGeneration(id);
     if (result.success) {
+      setQuestions([]);           // clear stale questions before GenerationProgress mounts
       setIsGenerating(true);
       getQuestionBank(id);
+      getQuestions(id);
     }
   };
 
@@ -297,8 +320,10 @@ export default function QuestionBankDetail() {
   const handleStartGeneration = async () => {
     const result = await startGeneration(id);
     if (result.success) {
+      setQuestions([]);           // clear stale questions before GenerationProgress mounts
       setIsGenerating(true);
       getQuestionBank(id);
+      getQuestions(id);
     }
   };
 
@@ -438,9 +463,6 @@ export default function QuestionBankDetail() {
                 {isGeneratingMore ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
                 Generate More
               </Button>
-              <Button variant="outline" size="sm" className="h-9" onClick={() => navigate(`/dashboard/question-bank/${id}/edit`)}>
-                <Pencil className="w-4 h-4 mr-2" />Edit
-              </Button>
               <Button variant="outline" size="sm" className="h-9" onClick={() => setExportModalOpen(true)} disabled={isExporting}>
                 {isExporting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}Export
               </Button>
@@ -456,6 +478,7 @@ export default function QuestionBankDetail() {
             bankId={id}
             sections={sections}
             existingQuestions={questions}
+            initialStatus={questionBank?.status}
             onGenerationCompleted={() => {
               setIsGenerating(false);
               getQuestionBank(id);
@@ -475,9 +498,6 @@ export default function QuestionBankDetail() {
             <div className="bg-white rounded-lg border border-neutral-200 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-[15px] font-semibold text-neutral-900">Configuration</h3>
-                <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/question-bank/${id}/edit`)}>
-                  <Pencil className="w-4 h-4 mr-2" />Edit Configuration
-                </Button>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div><p className="text-[11px] text-neutral-500">Curriculum</p><p className="text-[13px] font-medium text-neutral-900">{questionBank.curriculum}</p></div>
@@ -544,9 +564,6 @@ export default function QuestionBankDetail() {
                 <div className="text-center py-8 border border-dashed border-neutral-300 rounded-lg">
                   <FileText className="w-8 h-8 text-neutral-300 mx-auto mb-2" />
                   <p className="text-[13px] text-neutral-500">No sections configured</p>
-                  <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate(`/dashboard/question-bank/${id}/edit`)}>
-                    <Pencil className="w-4 h-4 mr-2" />Add Sections
-                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">

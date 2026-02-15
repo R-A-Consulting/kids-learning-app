@@ -25,6 +25,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useGetPaper, useUpdatePaper } from '@/services/apis/papers';
 import { subscribeToPaper } from '@/services/socket';
+import MessageFormatter from '@/components/canvas-chat/message-formatter';
 
 export default function AIQuestionDetailPage() {
   const { id } = useParams();
@@ -561,9 +562,9 @@ function QuestionCard({
               autoFocus
             />
           ) : (
-            <p className="text-[13px] text-neutral-800 leading-relaxed">
-              {question.text}
-            </p>
+            <div className="text-[13px] text-neutral-800 leading-relaxed">
+              <MessageFormatter>{question.text}</MessageFormatter>
+            </div>
           )}
         </div>
 
@@ -659,7 +660,7 @@ function QuestionCard({
                       ? "text-green-700 font-medium"
                       : "text-neutral-700"
                   )}>
-                    {option.text}
+                    <MessageFormatter inline>{option.text}</MessageFormatter>
                   </span>
                   {option.id === question.correctAnswer && (
                     <Check className="w-4 h-4 text-green-500 ml-auto" />
@@ -675,9 +676,9 @@ function QuestionCard({
               <p className="text-[10px] font-semibold text-green-600 uppercase tracking-wider mb-1">
                 Expected Answer
               </p>
-              <p className="text-[12px] text-green-800 leading-relaxed">
-                {question.expectedAnswer}
-              </p>
+              <div className="text-[12px] text-green-800 leading-relaxed">
+                <MessageFormatter>{question.expectedAnswer}</MessageFormatter>
+              </div>
               {question.marks && (
                 <p className="text-[10px] text-green-600 mt-2">
                   Marks: {question.marks}
@@ -695,9 +696,9 @@ function QuestionCard({
                   Explanation
                 </span>
               </div>
-              <p className="text-[12px] text-violet-800 leading-relaxed">
-                {question.explanation}
-              </p>
+              <div className="text-[12px] text-violet-800 leading-relaxed">
+                <MessageFormatter>{question.explanation}</MessageFormatter>
+              </div>
             </div>
           )}
         </div>

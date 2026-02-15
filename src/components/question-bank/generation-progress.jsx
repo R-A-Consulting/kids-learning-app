@@ -14,6 +14,7 @@ export default function GenerationProgress({
   bankId,
   sections,
   existingQuestions = [],
+  initialStatus,
   onQuestionGenerated,
   onSectionStarted,
   onSectionCompleted,
@@ -24,7 +25,10 @@ export default function GenerationProgress({
   const [sectionProgress, setSectionProgress] = useState({});
   const [generatedQuestions, setGeneratedQuestions] = useState([]);
   const [currentStatus, setCurrentStatus] = useState('GENERATING');
-  const [currentPhase, setCurrentPhase] = useState('PREPARING');
+  const [currentPhase, setCurrentPhase] = useState(() => {
+    if (initialStatus === 'GENERATING') return 'GENERATING';
+    return 'PREPARING';
+  });
   const [sectionShortfalls, setSectionShortfalls] = useState({});
   const [verificationResults, setVerificationResults] = useState({});
   const [verificationStats, setVerificationStats] = useState({ verified: 0, flagged: 0, failed: 0, fixed: 0, rejected: 0 });
@@ -74,7 +78,11 @@ export default function GenerationProgress({
   useEffect(() => {
     if (!bankId) return;
 
-    getSocket();
+    // Ensure socket is alive (handles stale disconnections)
+    const socket = getSocket();
+    if (!socket.connected && !socket.active) {
+      socket.connect();
+    }
     joinBankRoom(bankId);
 
     const handleUpdate = (data) => {
@@ -110,15 +118,10 @@ export default function GenerationProgress({
           }
           seenQuestionIdsRef.current.add(data.question._id);
           
-          setGeneratedQuestions((prev) => [...prev, data.question]);
+          if (currentPhaseRef.current === 'PREPARING') setCurrentPhase('GENERATING');
           
-          setSectionProgress((prev) => ({
-            ...prev,
-            [data.sectionId]: {
-              ...prev[data.sectionId],
-              generatedCount: (prev[data.sectionId]?.generatedCount || 0) + 1,
-            },
-          }));
+          setGeneratedQuestions((prev) => [...prev, { ...data.question, sectionId: data.sectionId }]);
+          
           callbacksRef.current.onQuestionGenerated?.(data.question);
           smartScroll();
           break;
@@ -128,32 +131,18 @@ export default function GenerationProgress({
           if (incoming.length === 0) return;
 
           const unique = [];
-          const increments = {};
 
           incoming.forEach((q) => {
             if (!q || !q._id || seenQuestionIdsRef.current.has(q._id)) return;
             seenQuestionIdsRef.current.add(q._id);
             unique.push(q);
-            const sectionId = q.sectionId || q.section;
-            if (sectionId) {
-              increments[sectionId] = (increments[sectionId] || 0) + 1;
-            }
           });
 
           if (unique.length === 0) return;
 
-          setGeneratedQuestions((prev) => [...prev, ...unique]);
+          if (currentPhaseRef.current === 'PREPARING') setCurrentPhase('GENERATING');
 
-          setSectionProgress((prev) => {
-            const next = { ...prev };
-            Object.entries(increments).forEach(([sectionId, count]) => {
-              next[sectionId] = {
-                ...next[sectionId],
-                generatedCount: (next[sectionId]?.generatedCount || 0) + count,
-              };
-            });
-            return next;
-          });
+          setGeneratedQuestions((prev) => [...prev, ...unique]);
 
           unique.forEach((q) => callbacksRef.current.onQuestionGenerated?.(q));
           smartScroll();
@@ -308,14 +297,20 @@ export default function GenerationProgress({
     };
   }, [bankId]);
 
-  const totalGenerated = Object.values(sectionProgress).reduce(
-    (sum, s) => sum + (s.generatedCount || 0),
-    0
-  );
+  // Derive counts from the actual questions array (single source of truth)
+  const activeQuestions = generatedQuestions.filter(q => !q.rejected);
+  const totalGenerated = activeQuestions.length;
   const totalTarget = Object.values(sectionProgress).reduce(
     (sum, s) => sum + (s.targetCount || 0),
     0
   );
+
+  // Per-section generated counts (used by pills + progress bar)
+  const sectionGeneratedCounts = {};
+  activeQuestions.forEach(q => {
+    const sid = String(q.sectionId || q.section?._id || q.section || '');
+    if (sid) sectionGeneratedCounts[sid] = (sectionGeneratedCounts[sid] || 0) + 1;
+  });
 
   // Get current section being generated
   const currentSection = Object.values(sectionProgress).find(s => s.status === 'GENERATING');
@@ -418,8 +413,9 @@ export default function GenerationProgress({
               {/* Segmented Progress Bar */}
               <div className="flex gap-0.5 h-2">
                 {sections?.map((section) => {
-                  const progress = sectionProgress[section._id] || { generatedCount: 0, targetCount: section.targetCount, status: 'PENDING' };
-                  const sectionPercent = progress.targetCount > 0 ? (progress.generatedCount / progress.targetCount) * 100 : 0;
+                  const progress = sectionProgress[section._id] || { targetCount: section.targetCount, status: 'PENDING' };
+                  const genCount = sectionGeneratedCounts[section._id] || 0;
+                  const sectionPercent = progress.targetCount > 0 ? (genCount / progress.targetCount) * 100 : 0;
                   const widthPercent = (section.targetCount / totalTarget) * 100;
                   
                   return (
@@ -427,7 +423,7 @@ export default function GenerationProgress({
                       key={section._id} 
                       className="relative bg-neutral-100 rounded-sm overflow-hidden"
                       style={{ width: `${widthPercent}%` }}
-                      title={`${section.name}: ${progress.generatedCount}/${progress.targetCount}`}
+                      title={`${section.name}: ${genCount}/${progress.targetCount}`}
                     >
                       <div
                         className={cn(
@@ -448,7 +444,8 @@ export default function GenerationProgress({
               {/* Section Pills */}
               <div className="flex items-center gap-2 mt-2 overflow-x-auto">
                 {sections?.map((section) => {
-                  const progress = sectionProgress[section._id] || { generatedCount: 0, targetCount: section.targetCount, status: 'PENDING' };
+                  const progress = sectionProgress[section._id] || { targetCount: section.targetCount, status: 'PENDING' };
+                  const genCount = sectionGeneratedCounts[section._id] || 0;
                   
                   return (
                     <div
@@ -470,7 +467,7 @@ export default function GenerationProgress({
                         <div className="w-2 h-2 rounded-full bg-current opacity-40" />
                       )}
                       <span>{section.name}</span>
-                      <span className="opacity-60">{progress.generatedCount}/{progress.targetCount}</span>
+                      <span className="opacity-60">{genCount}/{progress.targetCount}</span>
                       {progress.shortfall > 0 && (
                         <span className="text-amber-600 text-[9px] font-medium ml-1">
                           (-{progress.shortfall})

@@ -305,8 +305,8 @@ export default function CreateQuestionBank() {
     }
   };
 
-  const totalQuestions = sections.reduce((sum, s) => sum + s.targetCount, 0);
-  const totalMarks = sections.reduce((sum, s) => sum + s.targetCount * s.marksPerQuestion, 0);
+  const totalQuestions = sections.reduce((sum, s) => sum + (parseInt(s.targetCount) || 0), 0);
+  const totalMarks = sections.reduce((sum, s) => sum + (parseInt(s.targetCount) || 0) * (parseInt(s.marksPerQuestion) || 0), 0);
 
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
@@ -1063,7 +1063,10 @@ export default function CreateQuestionBank() {
                             min="1"
                             max="50"
                             value={section.targetCount}
-                            onChange={(e) => updateSection(index, 'targetCount', e.target.value)}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              updateSection(index, 'targetCount', raw === '' ? '' : (parseInt(raw) || 0));
+                            }}
                             onBlur={(e) => {
                               const n = parseInt(e.target.value);
                               updateSection(index, 'targetCount', isNaN(n) || n < 1 ? 1 : n > 50 ? 50 : n);
@@ -1094,7 +1097,10 @@ export default function CreateQuestionBank() {
                             min="1"
                             max="20"
                             value={section.marksPerQuestion}
-                            onChange={(e) => updateSection(index, 'marksPerQuestion', e.target.value)}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              updateSection(index, 'marksPerQuestion', raw === '' ? '' : (parseInt(raw) || 0));
+                            }}
                             onBlur={(e) => {
                               const n = parseInt(e.target.value);
                               updateSection(index, 'marksPerQuestion', isNaN(n) || n < 1 ? 1 : n > 20 ? 20 : n);

@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, Component } from 'react'
 import ReactMarkdown from 'react-markdown'
 import 'katex/dist/katex.min.css'
+import katex from 'katex'
+import 'katex/contrib/mhchem/mhchem.js' // Enable \ce{} for chemistry notation -- must come after katex import
 import { InlineMath, BlockMath } from 'react-katex'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
@@ -9,15 +11,61 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { Copy, Check } from 'lucide-react'
 
+// Verify mhchem registered (logs once in dev)
+if (typeof katex.__defineMacro === 'function' && !katex.__registeredMhchem) {
+  katex.__registeredMhchem = true
+}
+
+// React Error Boundary for KaTeX rendering -- catches render-phase errors
+class MathErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  render() {
+    if (this.state.hasError) {
+      return <code className="text-xs text-red-600 bg-red-50 px-1 py-0.5 rounded">{this.props.fallback}</code>
+    }
+    return this.props.children
+  }
+}
+
+// Safe wrappers for KaTeX that fall back to raw text on parse errors
+function SafeInlineMath({ math }) {
+  return (
+    <MathErrorBoundary fallback={math}>
+      <InlineMath math={math} />
+    </MathErrorBoundary>
+  )
+}
+
+function SafeBlockMath({ math }) {
+  return (
+    <MathErrorBoundary fallback={math}>
+      <BlockMath math={math} />
+    </MathErrorBoundary>
+  )
+}
+
 // Convert LaTeX delimiters to standard format for remark-math
-// Handles \( \) for inline math and \[ \] for display math
+// Handles \( \) for inline math, \[ \] for display math,
+// and wraps bare \ce{...} in $...$ so remark-math picks it up
 function preprocessMath(text) {
   if (!text || typeof text !== 'string') return text || '';
-  return text
+  let result = text
     .replace(/\\\(/g, '$')      // \( -> $
     .replace(/\\\)/g, '$')      // \) -> $
     .replace(/\\\[/g, '$$')     // \[ -> $$
     .replace(/\\\]/g, '$$');    // \] -> $$
+
+  // Wrap bare \ce{...} (not already inside $...$) in inline math delimiters
+  // Matches \ce{...} that is NOT preceded by $ or \(
+  result = result.replace(/(?<!\$)\\ce\{([^}]*)\}/g, '$\\ce{$1}$')
+
+  return result;
 }
 
 // Custom code block component with syntax highlighting and copy button
@@ -105,7 +153,7 @@ export default function MessageFormatter({ children, className, inline = false }
     <Wrapper className={className}>
       <ReactMarkdown
         remarkPlugins={[remarkMath, remarkGfm]}
-        rehypePlugins={[rehypeKatex]}
+        rehypePlugins={[[rehypeKatex, { throwOnError: false, errorColor: '#dc2626' }]]}
         components={{
           // Paragraphs with proper spacing
           p: ({ children }) => {
@@ -298,19 +346,19 @@ export default function MessageFormatter({ children, className, inline = false }
             <hr className="my-4 border-t border-gray-300" />
           ),
           
-          // Math components with better spacing
+          // Math components with better spacing and error-safe rendering
           span: ({ className, children, ...props }) => {
             if (className?.includes('math-inline')) {
               return (
                 <span className="inline-block mx-0.5">
-                  <InlineMath math={String(children)} />
+                  <SafeInlineMath math={String(children)} />
                 </span>
               )
             }
             if (className?.includes('math-display')) {
               return (
                 <div className="my-3 overflow-x-auto">
-                  <BlockMath math={String(children)} />
+                  <SafeBlockMath math={String(children)} />
                 </div>
               )
             }
@@ -321,7 +369,7 @@ export default function MessageFormatter({ children, className, inline = false }
             if (className?.includes('math-display')) {
               return (
                 <div className="my-3 overflow-x-auto">
-                  <BlockMath math={String(children)} />
+                  <SafeBlockMath math={String(children)} />
                 </div>
               )
             }

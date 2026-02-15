@@ -1,21 +1,9 @@
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  FileText,
-  HelpCircle,
-  Clock,
-  Star,
-  TrendingUp,
-  BarChart3,
-  PieChart,
-  Plus,
-  ArrowRight,
-  CheckCircle2,
-  Loader2,
-  AlertCircle,
-} from 'lucide-react';
+import { ArrowRight, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   useDashboardStats,
@@ -23,461 +11,182 @@ import {
   useRecentActivity,
 } from '@/services/apis/dashboard';
 
+const STATUS_STYLE = {
+  CONFIGURING: { label: 'Draft', cls: 'bg-slate-100 text-slate-600' },
+  PROCESSING_DOCS: { label: 'Processing', cls: 'bg-sky-50 text-sky-700' },
+  GENERATING: { label: 'Generating', cls: 'bg-violet-50 text-violet-700' },
+  REVIEWING: { label: 'Reviewing', cls: 'bg-amber-50 text-amber-700' },
+  COMPLETED: { label: 'Completed', cls: 'bg-emerald-50 text-emerald-700' },
+  FAILED: { label: 'Failed', cls: 'bg-red-50 text-red-700' },
+};
+
+const DIFF_COLOR = { EASY: 'bg-emerald-500', MEDIUM: 'bg-amber-500', HARD: 'bg-red-500', HOTS: 'bg-red-600' };
+const DIFF_LABEL = { EASY: 'Easy', MEDIUM: 'Medium', HARD: 'Hard', HOTS: 'HOTS' };
+const BLOOMS_LABEL = { REMEMBER: 'Remember', UNDERSTAND: 'Understand', APPLY: 'Apply', ANALYZE: 'Analyze', EVALUATE: 'Evaluate', CREATE: 'Create' };
+const BLOOMS_COLOR = 'bg-indigo-500';
+const TYPE_LABEL = { LONG_ANSWER: 'Long Answer', SHORT_ANSWER: 'Short Answer', LONG: 'Long Answer', SHORT: 'Short Answer', MCQ: 'MCQ', CASE_STUDY: 'Case Study' };
+const TYPE_COLOR = { LONG_ANSWER: 'bg-amber-500', SHORT_ANSWER: 'bg-sky-500', LONG: 'bg-amber-500', SHORT: 'bg-sky-500', MCQ: 'bg-violet-500', CASE_STUDY: 'bg-pink-500' };
+
+/* ── page ──────────────────────────────────────────────── */
+
 export default function QuestionBankDashboard() {
   const navigate = useNavigate();
-  const { stats, isLoading: statsLoading } = useDashboardStats();
-  const { metrics, isLoading: metricsLoading } = useQualityMetrics();
-  const { recentBanks, isLoading: activityLoading } = useRecentActivity();
+  const { stats, isLoading: sl } = useDashboardStats();
+  const { metrics, isLoading: ml } = useQualityMetrics();
+  const { recentBanks, isLoading: al } = useRecentActivity(10);
 
-  const formatTimeAgo = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
+  const bloomsTotal = useMemo(() => metrics?.bloomsDistribution?.reduce((s, b) => s + b.count, 0) || 0, [metrics?.bloomsDistribution]);
+  const diffTotal = useMemo(() => metrics?.difficultySpread?.reduce((s, d) => s + d.count, 0) || 0, [metrics?.difficultySpread]);
+  const typeTotal = useMemo(() => metrics?.questionTypeMix?.reduce((s, t) => s + t.count, 0) || 0, [metrics?.questionTypeMix]);
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 to-violet-50/30">
-      {/* Header */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.04] px-6 bg-white/80 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          <SidebarTrigger className="-ml-1 text-neutral-400 hover:text-neutral-600" />
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-              <BarChart3 className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h1 className="text-[15px] font-semibold text-neutral-900">Dashboard</h1>
-              <p className="text-[11px] text-neutral-500">Question Bank Generator</p>
-            </div>
-          </div>
+    <div className="flex h-full flex-col bg-white">
+      {/* header */}
+      <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b px-5">
+        <div className="flex items-center gap-2">
+          <SidebarTrigger className="-ml-1 text-muted-foreground hover:text-foreground" />
+          <h1 className="text-sm font-semibold text-slate-800">Question Banks</h1>
         </div>
-
-        <Button
-          onClick={() => navigate('/dashboard/question-bank/create')}
-          className="h-9 px-4 text-[12px] bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 shadow-lg shadow-violet-500/25"
-        >
-          <Plus className="w-3.5 h-3.5 mr-1.5" />
-          New Question Bank
+        <Button size="sm" onClick={() => navigate('/dashboard/question-bank/create')} className="h-8 bg-violet-600 text-xs hover:bg-violet-700">
+          <Plus className="mr-1 size-3.5" /> New
         </Button>
       </header>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-4 gap-4">
-            <StatCard
-              icon={<FileText className="w-5 h-5" />}
-              title="Total Banks"
-              value={stats?.totalBanks || 0}
-              change={`+${stats?.banksThisWeek || 0} this week`}
-              trend="up"
-              loading={statsLoading}
-              color="violet"
-            />
-            <StatCard
-              icon={<HelpCircle className="w-5 h-5" />}
-              title="Questions Generated"
-              value={stats?.totalQuestions || 0}
-              change={`+${stats?.questionsThisWeek || 0} this week`}
-              trend="up"
-              loading={statsLoading}
-              color="blue"
-            />
-            <StatCard
-              icon={<Clock className="w-5 h-5" />}
-              title="Time Saved"
-              value={`${stats?.timeSavedHours || 0} hrs`}
-              change="vs manual creation"
-              trend="up"
-              loading={statsLoading}
-              color="emerald"
-            />
-            <StatCard
-              icon={<Star className="w-5 h-5" />}
-              title="Avg Quality Score"
-              value={`${stats?.avgQualityScore || 0}%`}
-              change="Bloom's compliance"
-              trend="neutral"
-              loading={statsLoading}
-              color="amber"
-            />
-          </div>
-
-          {/* Charts Row */}
-          <div className="grid grid-cols-2 gap-4">
-            <BloomsDistributionChart
-              data={metrics?.bloomsDistribution}
-              loading={metricsLoading}
-            />
-            <DifficultySpreadChart
-              data={metrics?.difficultySpread}
-              loading={metricsLoading}
-            />
-          </div>
-
-          {/* Bottom Row */}
-          <div className="grid grid-cols-5 gap-4">
-            <div className="col-span-3">
-              <RecentActivityTable
-                banks={recentBanks}
-                loading={activityLoading}
-                onViewAll={() => navigate('/dashboard/question-bank')}
-                onBankClick={(bankId) => navigate(`/dashboard/question-bank/${bankId}`)}
-              />
-            </div>
-            <div className="col-span-2">
-              <QuestionTypeMixChart
-                data={metrics?.questionTypeMix}
-                loading={metricsLoading}
-              />
-            </div>
+      <div className="flex-1 overflow-y-auto">
+        {/* ── stats row ──────────────────────────────── */}
+        <div className="border-b px-5 py-4">
+          <div className="mx-auto flex max-w-5xl items-center gap-8">
+            <Stat label="Banks" value={stats?.totalBanks} sub={`+${stats?.banksThisWeek ?? 0} this wk`} loading={sl} />
+            <div className="h-8 w-px bg-slate-200" />
+            <Stat label="Questions" value={stats?.totalQuestions} sub={`+${stats?.questionsThisWeek ?? 0} this wk`} loading={sl} />
+            <div className="h-8 w-px bg-slate-200" />
+            <Stat label="Completed" value={stats?.completedBanks != null ? `${stats.completedBanks}/${stats.totalBanks}` : null} sub={`${stats?.completionRate ?? 0}%`} loading={sl} />
+            {(stats?.activeBanks ?? 0) > 0 && (
+              <>
+                <div className="h-8 w-px bg-slate-200" />
+                <Stat label="In Progress" value={stats.activeBanks} sub="generating" loading={false} />
+              </>
+            )}
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
 
-function StatCard({ icon, title, value, change, trend, loading, color }) {
-  const colorClasses = {
-    violet: 'bg-violet-50 text-violet-600',
-    blue: 'bg-blue-50 text-blue-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    amber: 'bg-amber-50 text-amber-600',
-  };
-
-  if (loading) {
-    return (
-      <div className="bg-white rounded-xl border border-neutral-200/60 p-5 shadow-sm">
-        <div className="flex items-center gap-3 mb-3">
-          <Skeleton className="w-10 h-10 rounded-lg" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-        <Skeleton className="h-8 w-16 mb-2" />
-        <Skeleton className="h-3 w-20" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-xl border border-neutral-200/60 p-5 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-center gap-3 mb-3">
-        <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', colorClasses[color])}>
-          {icon}
-        </div>
-        <span className="text-[12px] font-medium text-neutral-500">{title}</span>
-      </div>
-      <div className="text-[28px] font-bold text-neutral-900 tracking-tight">{value}</div>
-      <div
-        className={cn(
-          'text-[11px] flex items-center gap-1 mt-1',
-          trend === 'up' ? 'text-emerald-600' : 'text-neutral-500'
-        )}
-      >
-        {trend === 'up' && <TrendingUp className="w-3 h-3" />}
-        {change}
-      </div>
-    </div>
-  );
-}
-
-function BloomsDistributionChart({ data, loading }) {
-  const labels = ['Remember', 'Understand', 'Apply', 'Analyze', 'Evaluate', 'Create'];
-  const colors = ['#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95', '#3b0764'];
-
-  if (loading) {
-    return (
-      <div className="bg-white rounded-xl border border-neutral-200/60 p-5 shadow-sm">
-        <Skeleton className="h-5 w-48 mb-4" />
-        <div className="flex items-end gap-3 h-40">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="flex-1 flex flex-col items-center">
-              <Skeleton className="w-full" style={{ height: `${Math.random() * 80 + 20}%` }} />
-              <Skeleton className="h-3 w-6 mt-2" />
+        <div className="mx-auto max-w-5xl px-5 py-5 space-y-5">
+          {/* ── recent question banks ────────────────── */}
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-medium text-slate-800">Recent Question Banks</h2>
+              <button onClick={() => navigate('/dashboard/question-bank')} className="flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700">
+                View all <ArrowRight className="size-3" />
+              </button>
             </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
 
-  const maxCount = Math.max(...(data?.map((d) => d.count) || [1]));
-
-  return (
-    <div className="bg-white rounded-xl border border-neutral-200/60 p-5 shadow-sm">
-      <h3 className="text-[14px] font-semibold text-neutral-900 mb-4 flex items-center gap-2">
-        <BarChart3 className="w-4 h-4 text-violet-500" />
-        Bloom's Taxonomy Distribution
-      </h3>
-      <div className="flex items-end gap-3 h-40">
-        {data?.map((item, i) => (
-          <div key={item.level} className="flex-1 flex flex-col items-center">
-            <div
-              className="w-full rounded-t-lg transition-all hover:opacity-80"
-              style={{
-                height: `${maxCount > 0 ? (item.count / maxCount) * 100 : 0}%`,
-                backgroundColor: colors[i],
-                minHeight: item.count > 0 ? '8px' : '0px',
-              }}
-            />
-            <span className="text-[10px] mt-2 text-neutral-500 font-medium">
-              {labels[i]?.slice(0, 3)}
-            </span>
-            <span className="text-[11px] font-semibold text-neutral-700">{item.count}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DifficultySpreadChart({ data, loading }) {
-  const colors = {
-    EASY: '#22c55e',
-    MEDIUM: '#eab308',
-    HARD: '#f97316',
-    HOTS: '#ef4444',
-  };
-
-  const labels = {
-    EASY: 'Easy',
-    MEDIUM: 'Medium',
-    HARD: 'Hard',
-    HOTS: 'HOTS',
-  };
-
-  if (loading) {
-    return (
-      <div className="bg-white rounded-xl border border-neutral-200/60 p-5 shadow-sm">
-        <Skeleton className="h-5 w-36 mb-4" />
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="flex items-center gap-3">
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-4 flex-1 rounded-full" />
-              <Skeleton className="h-4 w-12" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const total = data?.reduce((sum, d) => sum + d.count, 0) || 1;
-
-  return (
-    <div className="bg-white rounded-xl border border-neutral-200/60 p-5 shadow-sm">
-      <h3 className="text-[14px] font-semibold text-neutral-900 mb-4 flex items-center gap-2">
-        <PieChart className="w-4 h-4 text-violet-500" />
-        Difficulty Spread
-      </h3>
-      <div className="space-y-3">
-        {data?.map((item) => (
-          <div key={item.level} className="flex items-center gap-3">
-            <span className="text-[12px] w-16 text-neutral-600 font-medium">
-              {labels[item.level] || item.level}
-            </span>
-            <div className="flex-1 h-5 bg-neutral-100 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${(item.count / total) * 100}%`,
-                  backgroundColor: colors[item.level],
-                }}
-              />
-            </div>
-            <span className="text-[12px] font-semibold w-12 text-right text-neutral-700">
-              {Math.round((item.count / total) * 100)}%
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function RecentActivityTable({ banks, loading, onViewAll, onBankClick }) {
-  if (loading) {
-    return (
-      <div className="bg-white rounded-xl border border-neutral-200/60 p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-8 w-20" />
-        </div>
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="flex items-center gap-3 p-3">
-              <Skeleton className="w-9 h-9 rounded-lg" />
-              <div className="flex-1">
-                <Skeleton className="h-4 w-40 mb-1" />
-                <Skeleton className="h-3 w-28" />
+            {al ? (
+              <div className="space-y-2">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}</div>
+            ) : !recentBanks?.length ? (
+              <p className="py-8 text-center text-sm text-slate-400">No question banks yet.</p>
+            ) : (
+              <div className="divide-y rounded-lg border">
+                {recentBanks.map((bank) => {
+                  const st = STATUS_STYLE[bank.status] || STATUS_STYLE.CONFIGURING;
+                  const qc = bank.questionCount ?? 0;
+                  return (
+                    <button
+                      key={bank._id}
+                      type="button"
+                      onClick={() => navigate(`/dashboard/question-bank/${bank._id}`)}
+                      className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-slate-50"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-900">{bank.title}</p>
+                        <p className="truncate text-xs text-slate-500">{bank.curriculum} Class {bank.grade} &middot; {bank.subject}</p>
+                      </div>
+                      <div className="ml-4 flex shrink-0 items-center gap-3">
+                        <span className="text-sm tabular-nums text-slate-700">{qc} Qs</span>
+                        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', st.cls)}>{st.label}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-              <Skeleton className="h-6 w-16 rounded-full" />
-            </div>
-          ))}
+            )}
+          </section>
+
+          {/* ── analytics row ────────────────────────── */}
+          <section className="grid gap-4 sm:grid-cols-3">
+            <BarPanel title="Bloom's Taxonomy" loading={ml} empty={!metrics?.bloomsDistribution?.length}>
+              {metrics?.bloomsDistribution?.map((b) => {
+                const pct = bloomsTotal > 0 ? Math.round((b.count / bloomsTotal) * 100) : 0;
+                return <HBar key={b.level} label={BLOOMS_LABEL[b.level] || b.level} pct={pct} color={BLOOMS_COLOR} />;
+              })}
+            </BarPanel>
+
+            <BarPanel title="Difficulty Spread" loading={ml} empty={!metrics?.difficultySpread?.length}>
+              {metrics?.difficultySpread?.map((d) => {
+                const pct = diffTotal > 0 ? Math.round((d.count / diffTotal) * 100) : 0;
+                return <HBar key={d.level} label={DIFF_LABEL[d.level] || d.level} pct={pct} color={DIFF_COLOR[d.level]} />;
+              })}
+            </BarPanel>
+
+            <BarPanel title="Question Types" loading={ml} empty={!metrics?.questionTypeMix?.length}>
+              {metrics?.questionTypeMix?.map((t) => {
+                const pct = typeTotal > 0 ? Math.round((t.count / typeTotal) * 100) : 0;
+                return <HBar key={t.type} label={TYPE_LABEL[t.type] || t.type} pct={pct} color={TYPE_COLOR[t.type] || 'bg-slate-400'} />;
+              })}
+            </BarPanel>
+          </section>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
+/* ── analytics shared components ───────────────────────── */
+
+function BarPanel({ title, loading, empty, children }) {
   return (
-    <div className="bg-white rounded-xl border border-neutral-200/60 p-5 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-[14px] font-semibold text-neutral-900">Recent Question Banks</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 text-[12px] text-violet-600 hover:text-violet-700"
-          onClick={onViewAll}
-        >
-          View all
-          <ArrowRight className="w-3.5 h-3.5 ml-1" />
-        </Button>
+    <div className="rounded-lg border p-4">
+      <h3 className="mb-3 text-xs font-medium text-slate-500">{title}</h3>
+      {loading ? (
+        <Skeleton className="h-28 w-full rounded" />
+      ) : empty ? (
+        <p className="py-4 text-center text-xs text-slate-400">No data yet</p>
+      ) : (
+        <div className="space-y-2.5">{children}</div>
+      )}
+    </div>
+  );
+}
+
+function HBar({ label, pct, color }) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-xs text-slate-600">{label}</span>
+        <span className="text-xs tabular-nums text-slate-500">{pct}%</span>
       </div>
+      <div className="h-1.5 rounded-full bg-slate-100">
+        <div className={cn('h-1.5 rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/* ── inline stat ───────────────────────────────────────── */
+
+function Stat({ label, value, sub, loading }) {
+  if (loading) {
+    return (
       <div className="space-y-1">
-        {banks?.length === 0 ? (
-          <div className="text-center py-8 text-neutral-500 text-[13px]">
-            No question banks yet. Create your first one!
-          </div>
-        ) : (
-          banks?.map((bank) => (
-            <div
-              key={bank._id}
-              className="flex items-center justify-between p-3 hover:bg-neutral-50 rounded-lg cursor-pointer transition-colors"
-              onClick={() => onBankClick(bank._id)}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={cn(
-                    'w-9 h-9 rounded-lg flex items-center justify-center',
-                    bank.status === 'COMPLETED'
-                      ? 'bg-emerald-50'
-                      : bank.status === 'GENERATING'
-                      ? 'bg-violet-50'
-                      : bank.status === 'FAILED'
-                      ? 'bg-red-50'
-                      : 'bg-neutral-50'
-                  )}
-                >
-                  {bank.status === 'GENERATING' ? (
-                    <Loader2 className="w-4 h-4 text-violet-500 animate-spin" />
-                  ) : bank.status === 'COMPLETED' ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  ) : bank.status === 'FAILED' ? (
-                    <AlertCircle className="w-4 h-4 text-red-500" />
-                  ) : (
-                    <FileText className="w-4 h-4 text-neutral-400" />
-                  )}
-                </div>
-                <div>
-                  <p className="text-[13px] font-medium text-neutral-900">{bank.title}</p>
-                  <p className="text-[11px] text-neutral-500">
-                    {bank.curriculum} Class {bank.grade} • {bank.subject}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-[12px] font-medium text-neutral-700">
-                  {bank.stats?.totalQuestions || 0} Qs
-                </p>
-                <StatusBadge status={bank.status} />
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function StatusBadge({ status }) {
-  const statusConfig = {
-    CONFIGURING: { label: 'Draft', className: 'bg-neutral-100 text-neutral-600' },
-    PROCESSING_DOCS: { label: 'Processing', className: 'bg-blue-50 text-blue-600' },
-    GENERATING: { label: 'Generating', className: 'bg-violet-50 text-violet-600' },
-    REVIEWING: { label: 'Reviewing', className: 'bg-amber-50 text-amber-600' },
-    COMPLETED: { label: 'Completed', className: 'bg-emerald-50 text-emerald-600' },
-    FAILED: { label: 'Failed', className: 'bg-red-50 text-red-600' },
-  };
-
-  const config = statusConfig[status] || statusConfig.CONFIGURING;
-
-  return (
-    <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full', config.className)}>
-      {config.label}
-    </span>
-  );
-}
-
-function QuestionTypeMixChart({ data, loading }) {
-  const colors = {
-    MCQ: '#8b5cf6',
-    SHORT: '#06b6d4',
-    LONG: '#f59e0b',
-    CASE_STUDY: '#ec4899',
-    ASSERTION_REASON: '#10b981',
-  };
-
-  const labels = {
-    MCQ: 'MCQ',
-    SHORT: 'Short Answer',
-    LONG: 'Long Answer',
-    CASE_STUDY: 'Case Study',
-    ASSERTION_REASON: 'Assertion-Reason',
-  };
-
-  if (loading) {
-    return (
-      <div className="bg-white rounded-xl border border-neutral-200/60 p-5 shadow-sm h-full">
-        <Skeleton className="h-5 w-36 mb-4" />
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex items-center gap-3">
-              <Skeleton className="w-3 h-3 rounded-full" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-8 ml-auto" />
-            </div>
-          ))}
-        </div>
+        <Skeleton className="h-3 w-14" />
+        <Skeleton className="h-6 w-10" />
       </div>
     );
   }
-
-  const total = data?.reduce((sum, d) => sum + d.count, 0) || 1;
-
   return (
-    <div className="bg-white rounded-xl border border-neutral-200/60 p-5 shadow-sm h-full">
-      <h3 className="text-[14px] font-semibold text-neutral-900 mb-4">Question Type Mix</h3>
-      <div className="space-y-3">
-        {data?.map((item) => (
-          <div key={item.type} className="flex items-center gap-3">
-            <div
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: colors[item.type] || '#94a3b8' }}
-            />
-            <span className="text-[12px] text-neutral-600 flex-1">
-              {labels[item.type] || item.type}
-            </span>
-            <span className="text-[12px] font-semibold text-neutral-700">
-              {Math.round((item.count / total) * 100)}%
-            </span>
-          </div>
-        ))}
-        {(!data || data.length === 0) && (
-          <div className="text-center py-4 text-neutral-500 text-[12px]">
-            No questions generated yet
-          </div>
-        )}
-      </div>
+    <div>
+      <p className="text-[11px] font-medium text-slate-400">{label}</p>
+      <p className="text-xl font-semibold tabular-nums text-slate-900">{value ?? '—'}</p>
+      {sub && <p className="text-[11px] text-slate-400">{sub}</p>}
     </div>
   );
 }

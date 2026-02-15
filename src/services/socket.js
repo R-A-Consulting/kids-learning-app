@@ -4,18 +4,36 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
 
 let socket = null;
 
+// Reference-counted room membership so multiple subscribers don't break each other
+const bankRoomRefs = {};
+const paperRoomRefs = {};
+
 export function getSocket() {
     if (!socket) {
         socket = io(SOCKET_URL, {
             withCredentials: true,
             autoConnect: true,
             reconnection: true,
-            reconnectionAttempts: 5,
+            reconnectionAttempts: Infinity,
             reconnectionDelay: 1000,
+            reconnectionDelayMax: 10000,
         });
 
         socket.on('connect', () => {
             console.log('[Socket.IO] Connected:', socket.id);
+            // Auto-rejoin all active rooms on reconnect
+            Object.keys(bankRoomRefs).forEach((bankId) => {
+                if (bankRoomRefs[bankId] > 0) {
+                    socket.emit('join_bank', bankId);
+                    console.log(`[Socket.IO] Rejoined room bank_${bankId} on reconnect`);
+                }
+            });
+            Object.keys(paperRoomRefs).forEach((paperId) => {
+                if (paperRoomRefs[paperId] > 0) {
+                    socket.emit('join_paper', paperId);
+                    console.log(`[Socket.IO] Rejoined room paper_${paperId} on reconnect`);
+                }
+            });
         });
 
         socket.on('disconnect', (reason) => {
@@ -26,19 +44,32 @@ export function getSocket() {
             console.error('[Socket.IO] Connection error:', error.message);
         });
     }
+    // If the socket was disconnected and exhausted retries, force reconnect
+    if (!socket.connected && !socket.active) {
+        console.log('[Socket.IO] Socket inactive, reconnecting...');
+        socket.connect();
+    }
     return socket;
 }
 
 export function joinPaperRoom(paperId) {
     const sock = getSocket();
-    sock.emit('join_paper', paperId);
-    console.log(`[Socket.IO] Joining room: paper_${paperId}`);
+    paperRoomRefs[paperId] = (paperRoomRefs[paperId] || 0) + 1;
+    if (paperRoomRefs[paperId] === 1) {
+        sock.emit('join_paper', paperId);
+        console.log(`[Socket.IO] Joining room: paper_${paperId}`);
+    }
 }
 
 export function leavePaperRoom(paperId) {
-    const sock = getSocket();
-    sock.emit('leave_paper', paperId);
-    console.log(`[Socket.IO] Leaving room: paper_${paperId}`);
+    if (!paperRoomRefs[paperId]) return;
+    paperRoomRefs[paperId]--;
+    if (paperRoomRefs[paperId] <= 0) {
+        delete paperRoomRefs[paperId];
+        const sock = getSocket();
+        sock.emit('leave_paper', paperId);
+        console.log(`[Socket.IO] Leaving room: paper_${paperId}`);
+    }
 }
 
 export function onPaperUpdate(callback) {
@@ -90,14 +121,22 @@ export function disconnectSocket() {
 
 export function joinBankRoom(bankId) {
     const sock = getSocket();
-    sock.emit('join_bank', bankId);
-    console.log(`[Socket.IO] Joining room: bank_${bankId}`);
+    bankRoomRefs[bankId] = (bankRoomRefs[bankId] || 0) + 1;
+    if (bankRoomRefs[bankId] === 1) {
+        sock.emit('join_bank', bankId);
+        console.log(`[Socket.IO] Joining room: bank_${bankId}`);
+    }
 }
 
 export function leaveBankRoom(bankId) {
-    const sock = getSocket();
-    sock.emit('leave_bank', bankId);
-    console.log(`[Socket.IO] Leaving room: bank_${bankId}`);
+    if (!bankRoomRefs[bankId]) return;
+    bankRoomRefs[bankId]--;
+    if (bankRoomRefs[bankId] <= 0) {
+        delete bankRoomRefs[bankId];
+        const sock = getSocket();
+        sock.emit('leave_bank', bankId);
+        console.log(`[Socket.IO] Leaving room: bank_${bankId}`);
+    }
 }
 
 export function onBankUpdate(callback) {
